@@ -4,100 +4,24 @@
 
 ## Настройка с нуля
 
-Чтобы восстановить окружение из репозитория на новой машине (macOS):
-
 ```sh
 git clone https://github.com/deeseefromcd/esp32-test-project
 cd esp32-test-project
 
-make doctor     # проверить, чего не хватает (ничего не ставит)
-make setup      # поставить brew-зависимости: actionlint, shellcheck
+make doctor     # что уже есть и чего не хватает (ничего не ставит)
+make setup      # поставить зависимости
 ```
 
-`make doctor` покажет, что есть, чего нет и какой командой это ставить. Ниже —
-что нужно вручную, потому что через brew это ставить нежелательно.
+**Список зависимостей живёт в одном месте** — `Brewfile` и `make doctor`. Doctor
+печатает для каждого недостающего инструмента точную команду установки, поэтому
+дублировать список в документации не нужно: он бы разошёлся с кодом.
 
-### 1. PlatformIO (`pio`)
+Один инструмент `make setup` не ставит — PlatformIO. Причина и рецепт:
+[Особенность этой машины](#особенность-этой-машины-macos--python-315).
 
-Рекомендуемый путь — изолированное venv (brew-версия на свежих Python ломается,
-см. [§ Особенность этой машины](#особенность-этой-машины-macos--python-315)).
-
-**Важно:** нужен Python, у которого `platform.mac_ver()` не пустой. На новой macOS
-`python3` по умолчанию может быть именно сломанной версией (например, 3.15), поэтому
-не полагайся на `python3` — укажи версию явно:
-
-```sh
-python3 -c 'import platform; print(platform.mac_ver())'   # убедиться, что НЕ пусто
-```
-
-Если вывод пустой — возьми другую версию (на машине автора работает 3.14):
-
-```sh
-brew install python@3.14                                  # если её нет
-/opt/homebrew/bin/python3.14 -m venv ~/.platformio-venv
-~/.platformio-venv/bin/python -m pip install --upgrade platformio
-```
-
-Makefile находит это venv автоматически. Если у тебя `pio` уже стоит и работает,
-ничего делать не нужно — Makefile возьмёт его из PATH. Переопределить путь можно
-так: `make build PIO=/путь/к/pio`.
-
-Первый `make build` скачает платформу `espressif32` и тулчейн — несколько сотен МБ
-и несколько минут. Это разовая операция.
-
-### 2. Wokwi CLI (`wokwi-cli`)
-
-```sh
-curl -L https://wokwi.com/ci/install.sh | sh    # ставит symlink в ~/bin
-```
-
-Нужен только для `make lint-diagram`. Для интерактивной разработки достаточно
-расширения **Wokwi for VS Code** (см. ниже).
-
-> Установщик дописывает `~/bin` в PATH твоей оболочки. `make` находит `wokwi-cli`
-> и без этого (ищет в `~/bin` и `~/.local/bin` тоже), а `make doctor` подскажет
-> готовую строку `export PATH=...`, если инструмент не в PATH.
-
-### 3. Ruby, Node
-
-На macOS `ruby` и `make` уже есть. Node нужен для `npx` (OpenSpec):
-
-```sh
-brew install node
-```
-
-### 4. OpenSpec (для `/opsx-*` команд)
-
-Слэш-команды OpenCode (`.opencode/commands/opsx-*`) вызывают `openspec` из PATH.
-Глобальная установка (в репозитории `package.json` при этом не появляется):
-
-```sh
-npm install -g @fission-ai/openspec@1.14.2
-```
-
-Без этого команды `/opsx-*` падают с `command not found`. Разовые вызовы без
-установки работают через `npx @fission-ai/openspec@latest ...`.
-
-> **Про секрет.** `WOKWI_CLI_TOKEN` (для локального прогона симуляции) на диск не
-> кладётся — он живёт в GitHub Secrets. `make doctor` сообщает, задан он или нет,
-> не печатая значение. Без токена доступны сборка, `make lint` и `make check`;
-> поведение проверяет Wokwi CI по push.
-
-### Кто чем проверяется
-
-| Инструмент | Нужен для | Если нет |
-| --- | --- | --- |
-| `pio` | `make build`, `make check`, `make lint-cppcheck` | сборка и lint не работают |
-| `wokwi-cli` | `make lint-diagram` | проверка схемы не работает |
-| `actionlint` | `make lint-workflow` | шаг пропускается с предупреждением |
-| `ruby` | `make lint-yaml` | проверка `config.yaml` не работает |
-| `node`/`npx` | `openspec validate`, разовые вызовы | проверка спек не работает |
-| `openspec` (глобально) | `/opsx-*` команды | команды падают |
-
-> **Добавляешь новый инструмент?** Зарегистрируй его в репозитории, иначе на чужой
-> машине он не появится: brew-пакет — в `Brewfile`, проверку — в `scripts/doctor.sh`,
-> строку — в таблицу выше. Согласованность этих трёх мест проверяет `make lint-deps`
-> (входит в `make lint`). Инструмент, нужный только в CI, регистрируется в workflow.
+Дальше — `make help` (все команды) и `make check` (lint + сборка).
+`WOKWI_CLI_TOKEN` на диск не кладётся — он в GitHub Secrets, см.
+[Синхронизация с Wokwi](#синхронизация-с-wokwi-github--симуляция).
 
 ## Что внутри
 
@@ -112,9 +36,8 @@ npm install -g @fission-ai/openspec@1.14.2
 | `.github/workflows/wokwi.yml` | GitHub Action: сборка и тест в Wokwi CI на каждый push |
 | `Makefile` | Удобные команды: `make setup`, `make doctor`, `make build`, `make check`, `make lint`, `make size`, `make flash`, `make sim` |
 | `Brewfile` | brew-зависимости проекта: `actionlint`, `shellcheck` (`make setup`) |
-| `scripts/doctor.sh` | Проверка окружения: чего не хватает и как это ставить (`make doctor`) |
+| `scripts/doctor.sh` | Проверка окружения: чего не хватает и как это ставить (`make doctor`) — читает `Brewfile` напрямую |
 | `scripts/check-openspec-config.rb` | Ловит дефект `openspec/config.yaml`, который `openspec validate` пропускает молча |
-| `scripts/check-deps.sh` | Проверяет, что зависимости согласованы: `Brewfile` ↔ `doctor.sh` ↔ README |
 | `AGENTS.md` | Инструкции для AI-агентов: обязательная синхронизация с wokwi.com, OpenSpec и обход известных проблем |
 | `docs/SDD-WORKFLOW.md` | Как ставить задачи через OpenSpec: шаблоны, разбор прошлой задачи, шпаргалка |
 | `openspec/` | Спецификации (SDD): `specs/` — актуальное поведение, `changes/` — предлагаемые изменения |
@@ -164,8 +87,18 @@ GPIO48 выбран потому, что на реальной плате ESP32-
 установке `tool-esptoolpy` (`ValueError: invalid literal for int() with base 10: ''`),
 и сборка обрывается ошибкой `MissingPackageManifestError`.
 
-Рабочее решение — отдельное venv (см. [Настройка с нуля](#настройка-с-нуля), шаг 1).
-Makefile находит его автоматически.
+Рабочее решение — поставить PlatformIO в отдельное venv на Python с рабочим
+`mac_ver()`:
+
+```sh
+python3 -c 'import platform; print(platform.mac_ver())'   # пусто → версия не годится
+
+/opt/homebrew/bin/python3.14 -m venv ~/.platformio-venv   # или другую рабочую версию
+~/.platformio-venv/bin/python -m pip install -U platformio
+```
+
+Makefile находит это venv сам, иначе берёт `pio` из PATH. Переопределить:
+`make build PIO=/путь/к/pio`.
 
 Чтобы `pio` работал и из терминала VS Code, можно добавить его в PATH (`~/.zprofile`):
 

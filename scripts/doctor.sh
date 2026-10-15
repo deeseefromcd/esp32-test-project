@@ -4,8 +4,9 @@
 #
 # Запуск:  make doctor          (или напрямую: bash scripts/doctor.sh)
 #
-# Скрипт ничего не устанавливает — только сообщает. Установка — осознанное
-# действие (make setup или команды ниже), а не побочный эффект проверки.
+# Это и есть документация по зависимостям: список инструментов, их версии
+# и команды установки живут здесь и в Brewfile, а не дублируются прозой
+# в README. Скрипт ничего не устанавливает — только сообщает.
 #
 # Инструменты ищутся в PATH и в известных местах установки (~/bin, ~/.local/bin),
 # потому что домашние каталоги bin часто не попадают в PATH неинтерактивных
@@ -31,7 +32,6 @@ resolve() {
   local name="$1" hint="${2:-}"
   if [ -n "$hint" ]; then
     if [ -x "$hint" ]; then printf '%s' "$hint"; return 0; fi
-    # Подсказка могла быть именем команды, а не путём
     if command -v "$hint" >/dev/null 2>&1; then command -v "$hint"; return 0; fi
     return 1
   fi
@@ -44,32 +44,18 @@ resolve() {
   return 1
 }
 
-# require <имя> <подсказка-путь> <как получить версию> <как ставить>
-# Подсказка может быть пустой. Версия печатается из найденного полного пути.
+# require <имя> <подсказка-путь> <команда версии> <как ставить>
+# Подсказка может быть пустой. __PATH__ подставляется найденным путём.
 require() {
   local name="$1" hint="$2" ver="$3" how="$4" path
   if path=$(resolve "$name" "$hint"); then
     local v; v=$(eval "${ver//__PATH__/$path}" 2>&1 | head -1 | tr -d '\r')
     printf '  %s✓%s %-14s %s%s%s\n' "$GRN" "$RST" "$name" "$DIM" "$v" "$RST"
-    printf '      %s%s%s\n' "$DIM" "$path" "$RST"
     ok_count=$((ok_count + 1))
   else
     printf '  %s✗%s %-14s %sНЕ НАЙДЕН%s\n' "$RED" "$RST" "$name" "$RED" "$RST"
     printf '      %sустановка: %s%s\n' "$DIM" "$how" "$RST"
     miss_required=$((miss_required + 1))
-  fi
-}
-
-# optional <имя> <подсказка-путь> <как получить версию> <что будет без него> <как ставить>
-optional() {
-  local name="$1" hint="$2" ver="$3" effect="$4" how="$5" path
-  if path=$(resolve "$name" "$hint"); then
-    local v; v=$(eval "${ver//__PATH__/$path}" 2>&1 | head -1 | tr -d '\r')
-    printf '  %s✓%s %-14s %s%s%s\n' "$GRN" "$RST" "$name" "$DIM" "$v" "$RST"
-  else
-    printf '  %s·%s %-14s %sне найден — %s%s\n' "$YEL" "$RST" "$name" "$YEL" "$effect" "$RST"
-    printf '      %sустановка: %s%s\n' "$DIM" "$how" "$RST"
-    miss_optional=$((miss_optional + 1))
   fi
 }
 
@@ -81,18 +67,35 @@ echo
 PIO_HINT="${PIO:-}"
 WOKWI_HINT="${WOKWI_CLI:-}"
 
+# --- обязательные: не ставятся через brew, поэтому объявлены явно -----------
 echo "${B}Обязательное${RST}"
 require "git"       ""            "__PATH__ --version"  "brew install git (на macOS уже есть)"
 require "make"      ""            "__PATH__ --version"  "xcode-select --install"
-require "ruby"      ""            "__PATH__ -v"         "на macOS ruby уже есть; иначе: brew install ruby"
+require "ruby"      ""            "__PATH__ -v"         "brew install ruby"
 require "node"      ""            "__PATH__ -v"         "brew install node  (нужен для npx/openspec)"
-require "pio"       "$PIO_HINT"   "__PATH__ --version"  "см. README, раздел «Настройка с нуля» (venv или официальный установщик)"
+require "pio"       "$PIO_HINT"   "__PATH__ --version"  "brew install platformio  — на части машин brew-версия ломается на новом Python; тогда отдельное venv (README, «Особенность этой машины»)"
 require "wokwi-cli" "$WOKWI_HINT" "__PATH__ --version"  "curl -L https://wokwi.com/ci/install.sh | sh"
 
+# --- из Brewfile: единственный источник истины для того, что ставит make setup
+# Список не перечисляем вручную — читаем Brewfile. Добавил пакет в Brewfile →
+# make setup его поставит, а make doctor о нём сообщит. Двух мест уже нет.
 echo
-echo "${B}Необязательное${RST}"
-optional "actionlint" "" "__PATH__ --version" "make lint пропустит шаг проверки workflow" "brew install actionlint"
-optional "shellcheck" "" "__PATH__ --version" "actionlint проверяет блоки run: слабее"      "brew install shellcheck (тянется с actionlint)"
+echo "${B}Из Brewfile (ставит make setup)${RST}"
+if [ -f Brewfile ]; then
+  while IFS= read -r pkg; do
+    [ -n "$pkg" ] || continue
+    if path=$(resolve "$pkg" ""); then
+      v=$( "$path" --version 2>&1 | head -1 | tr -d '\r' )
+      printf '  %s✓%s %-14s %s%s%s\n' "$GRN" "$RST" "$pkg" "$DIM" "$v" "$RST"
+      ok_count=$((ok_count + 1))
+    else
+      printf '  %s·%s %-14s %sне найден — поставь: make setup%s\n' "$YEL" "$RST" "$pkg" "$YEL" "$RST"
+      miss_optional=$((miss_optional + 1))
+    fi
+  done < <(grep -oE '^[[:space:]]*brew[[:space:]]+"[^"]+"' Brewfile | sed -E 's/.*"([^"]+)".*/\1/' | sort -u)
+else
+  printf '  %s·%s Brewfile не найден — запускай make doctor из корня проекта\n' "$YEL" "$RST"
+fi
 
 echo
 echo "${B}Итог${RST}"
@@ -101,7 +104,7 @@ if [ "$miss_required" -eq 0 ]; then
 else
   printf '  %sне хватает обязательных: %s%s\n' "$RED" "$miss_required" "$RST"
 fi
-[ "$miss_optional" -gt 0 ] && printf '  %sнеобязательных нет: %s%s\n' "$YEL" "$miss_optional" "$RST"
+[ "$miss_optional" -gt 0 ] && printf '  %sне хватает из Brewfile: %s — поставь: make setup%s\n' "$YEL" "$miss_optional" "$RST"
 
 # --- контекст, который стоит знать ------------------------------------------
 echo
@@ -112,7 +115,7 @@ WOKWI_PATH=$(resolve "wokwi-cli" "$WOKWI_HINT" || true)
 
 printf '  %s·%s pio:        %s\n' "$DIM" "$RST" "${PIO_PATH:-не найден}"
 
-# Подсказка про venv-обход: только если именно venv-путь и выбран.
+# Подсказка про venv-обход: только если выбран именно venv-путь.
 if [ -n "$PIO_PATH" ] && [ "$PIO_PATH" = "$HOME/.platformio-venv/bin/pio" ]; then
   printf '      %sвзят venv-путь: обход сломанного brew-pio (см. AGENTS.md §4.6)%s\n' "$YEL" "$RST"
 fi
@@ -149,7 +152,7 @@ fi
 
 echo
 if [ "$miss_required" -eq 0 ]; then
-  printf '%sОкружение готово.%s Дальше: %smake check%s  (или %smake build%s + симулятор в VS Code)\n' \
+  printf '%sОкружение готово.%s Дальше: %smake help%s  (команды) · %smake check%s  (lint и сборка)\n' \
     "$GRN" "$RST" "$B" "$RST" "$B" "$RST"
   exit 0
 fi
