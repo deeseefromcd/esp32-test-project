@@ -1,0 +1,11 @@
+# Артефакты сборки Arduino / ESP-IDF / PlatformIO
+build/
+.pio/
+.vscode/
+*.bin
+*.elf
+*.hex
+*.map
+
+# macOS
+.DS_Store
