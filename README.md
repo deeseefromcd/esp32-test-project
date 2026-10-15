@@ -10,6 +10,9 @@
 | `src/main.cpp` | Прошивка: мигает светодиодом на GPIO48 |
 | `diagram.json` | Схема для симулятора Wokwi: плата ESP32-S3, светодиод, резистор 220 Ом |
 | `wokwi.toml` | Указывает Wokwi, где лежит собранная прошивка (`.pio/build/...`) |
+| `sketch.ino` | Копия кода для вставки в редактор на wokwi.com (на сборку не влияет) |
+| `blink.test.yaml` | Сценарий проверки для Wokwi CI (мигание + уровень на пине) |
+| `.github/workflows/wokwi.yml` | GitHub Action: сборка и тест в Wokwi CI на каждый push |
 | `Makefile` | Удобные команды: `make build`, `make clean`, `make size`, `make flash`, `make sim` |
 | `.gitignore` | Исключает артефакты сборки |
 
@@ -73,3 +76,38 @@ echo 'export PATH="$HOME/.platformio-venv/bin:$PATH"' >> ~/.zprofile
 
 - Светодиод мигает с периодом 1 секунда (1 сек горит, 1 сек не горит).
 - Serial Monitor (115200 бод) показывает начало работы и смену состояния.
+
+## Синхронизация с Wokwi (GitHub → симуляция)
+
+Важно: **автоматической синхронизации «пуш в GitHub → проект на wokwi.com» не существует.**
+У Wokwi две независимые вещи:
+
+1. **Проект на wokwi.com** — то, чем делятся ссылкой (`https://wokwi.com/projects/<id>`).
+   Авто-импорта из GitHub нет: код и `diagram.json` там обновляются вручную.
+2. **Wokwi CI (GitHub Actions)** — по пушу собирает прошивку и прогоняет симуляцию в облаке
+   (проверка, а не публичная ссылка).
+
+### Ссылка для друзей (wokwi.com)
+
+1. Открыть <https://wokwi.com> → **New Project** → ESP32-S3.
+2. Вставить в редактор содержимое `sketch.ino`, а во вкладку `diagram.json` — содержимое `diagram.json`.
+3. Нажать **Save** и скопировать ссылку проекта — её и отправлять друзьям.
+   Они нажмут **Play** прямо в браузере, ничего устанавливать не нужно.
+
+При изменениях кода: обновить два файла на wokwi.com вручную (копия кода лежит в `sketch.ino`,
+схема — в `diagram.json`).
+
+### Авто-проверка на GitHub (Wokwi CI)
+
+В репозитории уже есть workflow `.github/workflows/wokwi.yml` и сценарий `blink.test.yaml`:
+на каждый push/PR GitHub собирает прошивку (`pio run`) и прогоняет её в Wokwi CI, проверяя,
+что LED мигает и пин GPIO48 меняет уровень.
+
+Чтобы включить, один раз добавь секрет:
+
+1. Получить токен на <https://wokwi.com/dashboard/ci> (начинается с `wok_`, 44 символа).
+2. GitHub → репозиторий → **Settings → Secrets and variables → Actions → New repository secret**.
+3. Имя: `WOKWI_CLI_TOKEN`, значение: токен.
+
+Бесплатного тарифа хватает (50 минут симуляции в месяц). Результат видно во вкладке
+**Actions** на GitHub.

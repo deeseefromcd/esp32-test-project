@@ -1,0 +1,16 @@
+name: Blinky test
+version: 1
+author: deeseefromcd
+
+steps:
+  - wait-serial: 'ESP32-S3 blink started (GPIO48)'
+  - wait-serial: 'LED ON'
+  - expect-pin:
+      part-id: led1
+      pin: A
+      value: 1
+  - wait-serial: 'LED OFF'
+  - expect-pin:
+      part-id: led1
+      pin: A
+      value: 0

@@ -12,7 +12,7 @@
 #include <Arduino.h>
 
 #define LED_PIN 48            // GPIO48 — на плате это встроенный светодиод
-#define BLINK_DELAY_MS 5000   // период мигания: 1 секунда
+#define BLINK_DELAY_MS 1000   // период мигания: 1 секунда
 
 void setup() {
   Serial.begin(115200);
