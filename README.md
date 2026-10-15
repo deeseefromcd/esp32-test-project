@@ -13,12 +13,17 @@
 | `sketch.ino` | Копия кода для вставки в редактор на wokwi.com (на сборку не влияет) |
 | `blink.test.yaml` | Сценарий проверки для Wokwi CI (мигание + уровень на пине) |
 | `.github/workflows/wokwi.yml` | GitHub Action: сборка и тест в Wokwi CI на каждый push |
-| `Makefile` | Удобные команды: `make build`, `make clean`, `make size`, `make flash`, `make sim` |
-| `AGENTS.md` | Инструкции для AI-агентов: обязательная синхронизация с wokwi.com и обход известных проблем |
+| `Makefile` | Удобные команды: `make build`, `make check`, `make lint`, `make size`, `make flash`, `make sim` |
+| `scripts/check-openspec-config.rb` | Ловит дефект `openspec/config.yaml`, который `openspec validate` пропускает молча |
+| `AGENTS.md` | Инструкции для AI-агентов: обязательная синхронизация с wokwi.com, OpenSpec и обход известных проблем |
+| `docs/SDD-WORKFLOW.md` | Как ставить задачи через OpenSpec: шаблоны, разбор прошлой задачи, шпаргалка |
+| `openspec/` | Спецификации (SDD): `specs/` — актуальное поведение, `changes/` — предлагаемые изменения |
+| `.opencode/` | Слэш-команды `/opsx-*` и навыки OpenSpec для OpenCode |
 | `.gitignore` | Исключает артефакты сборки |
 
 > **AI-агентам:** перед работой прочитай [`AGENTS.md`](./AGENTS.md) — там обязательный шаг
-> «после пуша обновить проект на wokwi.com» и список известных граблей.
+> «после пуша обновить проект на wokwi.com», правила OpenSpec и список известных граблей.
+> Задача меняет поведение — планируй через OpenSpec (см. [`docs/SDD-WORKFLOW.md`](./docs/SDD-WORKFLOW.md)).
 
 ## Схема
 
