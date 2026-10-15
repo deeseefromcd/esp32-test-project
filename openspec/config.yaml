@@ -12,8 +12,9 @@ context: |
   "ESP32-S3 blink started (GPIO48)", "LED ON", "LED OFF".
 
   Команды этого проекта (используй именно их):
+    make setup        — поставить brew-зависимости (Brewfile); make doctor — проверить окружение
     make lint         — cppcheck + схема + config.yaml + workflow (быстро, без сборки)
-    make check        — то же + сборка прошивки (использует ~/.platformio-venv/bin/pio; brew-pio на этой машине сломан)
+    make check        — то же + сборка прошивки (автоматически находит pio: venv или из PATH)
     make build        — только сборка прошивки
     сценарий blink.test.yaml — проверка симуляции (serial + уровень на пине led1:A), но только в CI: локально нет токена
 

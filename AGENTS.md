@@ -90,12 +90,13 @@ Wokwi CI лишь проверяет код в облаке и не публик
 
 ## 3. Обязательные проверки перед пушем
 
+- **Окружение в порядке:** `make doctor` — «чего не хватает» и как это ставить (ничего не ставит).
+  Ставит brew-зависимости `make setup`. Подробности — README, «Настройка с нуля».
 - **`sketch.ino` и `src/main.cpp` должны быть синхронны.** `sketch.ino` — это ручная копия для
   вставки на wokwi.com; PlatformIO её не компилирует. Правишь одно — поправь второе (допустимо
   оставить в `.ino` шапку-комментарий, но тело кода должно совпадать).
-- **Сборка проходит:** `make build` (использует `~/.platformio-venv/bin/pio`, см. §4.6).
-- **Схема валидна:** `~/.local/bin/wokwi-cli lint` — допустим только `[unsupported-part]` (info).
-- **YAML валиден** для `.github/workflows/wokwi.yml` и `blink.test.yaml`.
+- **`make check` проходит** — это lint (cppcheck + схема + `config.yaml` + workflow) и сборка.
+  Для правки только документации достаточно `make lint`.
 - Не пушь, пока не понял, *почему* проходят или падают тесты.
 
 ---
@@ -170,11 +171,13 @@ Wokwi ставит `beforeunload`. Если есть несохранённые 
 `brew install platformio` тянет Python 3.15, где `platform.mac_ver()` возвращает `''` → падение
 `pip` на `tool-esptoolpy` → `MissingPackageManifestError`.
 
-**Обход:** отдельное venv на Python 3.14:
-```sh
-~/.platformio-venv/bin/pio run
-```
-В PATH он добавляется через `~/.zprofile`. `make` уже настроен на это venv.
+**Обход:** отдельное venv (`~/.platformio-venv/bin/pio`). Makefile находит его автоматически
+(иначе берёт `pio` из PATH), так что жёстких машинных путей в командах нет.
+Проверить окружение: `make doctor`; поставить brew-зависимости: `make setup`.
+
+**Важно при правке Makefile:** пути `PIO` и `WOKWI_CLI` определяются через автодетект
+(`ifeq ($(strip $(PIO)),)` + `$(shell ...)`). Не заменяй их обратно на хардкод
+`$(HOME)/.platformio-venv/...` — на машине коллеги без этого venv команда сломается.
 
 ### 4.7 Wokwi CI ≠ страница wokwi.com
 
@@ -289,6 +292,7 @@ npx @fission-ai/openspec@latest instructions apply --change <change> --json
 | Сборка | `make build` | да | да |
 | **Поведение (serial + пин)** | `blink.test.yaml` | **нет** | да |
 | **Юнит-тесты** | `pio test -e native` | пока нет цели | — |
+| **Окружение** | `make doctor` | да | — |
 
 Всё локальное сразу — `make lint`; локальное плюс сборка — `make check`.
 

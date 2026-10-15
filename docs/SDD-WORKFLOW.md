@@ -443,6 +443,9 @@ make lint    # cppcheck + схема + config.yaml + workflow   (~10 секун�
 make check   # lint + сборка прошивки
 ```
 
+Перед первой работой — `make doctor` (чего не хватает на машине) и `make setup`
+(brew-зависимости). Детали — README, «Настройка с нуля».
+
 | Проверка | Команда | Локально | В CI |
 | --- | --- | --- | --- |
 | Дефекты C++ | `make lint-cppcheck` (cppcheck) | да | — |
@@ -452,6 +455,7 @@ make check   # lint + сборка прошивки
 | Сборка | `make build` | да | да |
 | **Поведение (serial + пин)** | `blink.test.yaml` | **нет** | да |
 | **Юнит-тесты** | `pio test -e native` | пока нет цели | — |
+| **Окружение** | `make doctor` | да | — |
 
 ### Почему поведение проверяется только в CI
 
