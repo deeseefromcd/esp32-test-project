@@ -439,12 +439,30 @@ npx @fission-ai/openspec@latest new change <имя>
 Все локальные проверки собраны за двумя целями `make`:
 
 ```sh
-make lint    # cppcheck + схема + config.yaml + workflow   (~10 секунд)
+make lint    # cppcheck + схема + config.yaml + workflow + зависимости   (~10 секунд)
 make check   # lint + сборка прошивки
 ```
 
 Перед первой работой — `make doctor` (чего не хватает на машине) и `make setup`
 (brew-зависимости). Детали — README, «Настройка с нуля».
+
+### Новый инструмент нужно регистрировать
+
+Если задача вводит инструмент, нужный на машине, — поставить его локально
+**недостаточно**. Незарегистрированный инструмент существует только у тебя:
+коллега восстановит окружение из репозитория, а его там нет. Регистрация:
+
+1. brew-пакет → строка `brew "<имя>"` в `Brewfile` (поставит `make setup`);
+2. проверка → `require`/`optional` в `scripts/doctor.sh` (сообщит `make doctor`);
+3. назначение → строка в таблице README «Кто чем проверяется».
+
+Согласованность этих трёх мест стережёт `make lint-deps` (входит в `make lint`):
+если пакет есть в `Brewfile`, но не в `doctor.sh` или README — линтер упадёт с
+указанием, что дописать. Инструмент, нужный **только в CI**, регистрируется в
+workflow, а не в `Brewfile`.
+
+Это правило продублировано в `openspec/config.yaml` (в `context`, `rules.tasks` и
+`operations.apply.guidance`), поэтому приходит агенту автоматически.
 
 | Проверка | Команда | Локально | В CI |
 | --- | --- | --- | --- |
@@ -452,6 +470,7 @@ make check   # lint + сборка прошивки
 | Схема `diagram.json` | `make lint-diagram` (`wokwi-cli lint`) | да | — |
 | `openspec/config.yaml` | `make lint-yaml` | да | — |
 | Workflow | `make lint-workflow` (actionlint) | да | да |
+| Согласованность зависимостей | `make lint-deps` (Brewfile ↔ doctor ↔ README) | да | — |
 | Сборка | `make build` | да | да |
 | **Поведение (serial + пин)** | `blink.test.yaml` | **нет** | да |
 | **Юнит-тесты** | `pio test -e native` | пока нет цели | — |

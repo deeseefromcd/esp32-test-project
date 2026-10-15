@@ -31,7 +31,7 @@ endif
 ENV ?= esp32-s3-devkitc-1
 ACTIONLINT ?= actionlint
 
-.PHONY: help setup doctor build clean size flash sim lint check lint-cppcheck lint-diagram lint-yaml lint-workflow
+.PHONY: help setup doctor build clean size flash sim lint check lint-cppcheck lint-diagram lint-yaml lint-workflow lint-deps
 
 help:
 	@echo "Доступные цели:"
@@ -42,7 +42,7 @@ help:
 	@echo "  make size    — размер прошивки"
 	@echo "  make flash   — прошить плату"
 	@echo "  make sim     — как запустить симулятор Wokwi"
-	@echo "  make lint    — cppcheck + схема + config.yaml + workflow"
+	@echo "  make lint    — cppcheck + схема + config.yaml + workflow + зависимости"
 	@echo "  make check   — lint и сборка (быстрая проверка перед коммитом)"
 	@echo ""
 	@echo "Используемый pio:       $(PIO)"
@@ -89,7 +89,7 @@ sim: build
 # ("setup/loop is never used" — их вызывает фреймворк), а medium и выше ловит
 # настоящие дефекты.
 
-lint: lint-cppcheck lint-diagram lint-yaml lint-workflow
+lint: lint-cppcheck lint-diagram lint-yaml lint-workflow lint-deps
 	@echo ""
 	@echo "Все локальные проверки пройдены."
 
@@ -110,6 +110,10 @@ lint-workflow:
 	@command -v $(ACTIONLINT) >/dev/null 2>&1 \
 		&& $(ACTIONLINT) .github/workflows/wokwi.yml \
 		|| echo "actionlint не установлен — шаг пропущен (make setup или brew install actionlint)"
+
+lint-deps:
+	@echo "== согласованность зависимостей =="
+	@bash scripts/check-deps.sh
 
 check: lint build
 	@echo ""

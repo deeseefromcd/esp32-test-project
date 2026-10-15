@@ -94,6 +94,11 @@ npm install -g @fission-ai/openspec@1.14.2
 | `node`/`npx` | `openspec validate`, разовые вызовы | проверка спек не работает |
 | `openspec` (глобально) | `/opsx-*` команды | команды падают |
 
+> **Добавляешь новый инструмент?** Зарегистрируй его в репозитории, иначе на чужой
+> машине он не появится: brew-пакет — в `Brewfile`, проверку — в `scripts/doctor.sh`,
+> строку — в таблицу выше. Согласованность этих трёх мест проверяет `make lint-deps`
+> (входит в `make lint`). Инструмент, нужный только в CI, регистрируется в workflow.
+
 ## Что внутри
 
 | Файл | Назначение |
@@ -109,6 +114,7 @@ npm install -g @fission-ai/openspec@1.14.2
 | `Brewfile` | brew-зависимости проекта: `actionlint`, `shellcheck` (`make setup`) |
 | `scripts/doctor.sh` | Проверка окружения: чего не хватает и как это ставить (`make doctor`) |
 | `scripts/check-openspec-config.rb` | Ловит дефект `openspec/config.yaml`, который `openspec validate` пропускает молча |
+| `scripts/check-deps.sh` | Проверяет, что зависимости согласованы: `Brewfile` ↔ `doctor.sh` ↔ README |
 | `AGENTS.md` | Инструкции для AI-агентов: обязательная синхронизация с wokwi.com, OpenSpec и обход известных проблем |
 | `docs/SDD-WORKFLOW.md` | Как ставить задачи через OpenSpec: шаблоны, разбор прошлой задачи, шпаргалка |
 | `openspec/` | Спецификации (SDD): `specs/` — актуальное поведение, `changes/` — предлагаемые изменения |
