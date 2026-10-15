@@ -8,6 +8,8 @@
     { "type": "wokwi-resistor", "id": "r1", "top": -43.3, "left": 203.78, "rotate": 90, "attrs": { "value": "220" } }
   ],
   "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
     [ "esp:48", "led1:A", "green", [ "v0" ] ],
     [ "led1:C", "r1:1", "black", [ "v0" ] ],
     [ "r1:2", "esp:GND.1", "black", [ "v0" ] ]
