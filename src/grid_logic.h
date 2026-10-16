@@ -4,8 +4,11 @@
 
   Здесь нет Arduino.h и нет обращений к железу: на входе числа и массивы,
   на выходе тоже. Поэтому модуль собирается и проверяется на хосте
-  ([env:native], make test) — без платы и без токена Wokwi. Это единственная
-  проверка поведения, которую можно прогнать локально.
+  ([env:native], make test) — без платы и без токена Wokwi.
+
+  Объявления (типы) стоят выше отметки склейки, функции — ниже: так модуль
+  собирается одним файлом в редакторе wokwi.com, где Arduino-компилятор сам
+  вставляет прототипы функций.
 */
 #pragma once
 
@@ -24,6 +27,23 @@ struct Cell {
   int row;  // 1..4
   int col;  // 0..3, то есть A..D
 };
+
+// Дребезг контакта: при замыкании геркон (и кнопка) замыкается и размыкается
+// десятки раз за миллисекунды. Поэтому новое состояние принимается только
+// после того, как продержалось windowMs — тогда серия даёт одно событие.
+struct Debounce {
+  bool stable[kCells];
+  bool candidate[kCells];
+  uint32_t sinceMs[kCells];
+};
+
+// Что изменилось между двумя проходами: бит i — клетка с индексом i.
+struct Changes {
+  uint16_t closed;
+  uint16_t opened;
+};
+
+// ==== склейка: выше объявления, ниже функции ====
 
 inline int indexOf(Cell c) { return (c.row - 1) * kCols + c.col; }
 
@@ -56,15 +76,6 @@ inline void nameOf(Cell c, char* out, size_t size) {
   snprintf(out, size, "%c%c", 'A' + c.col, '1' + (c.row - 1));
 }
 
-// Дребезг контакта: при замыкании геркон (и кнопка) замыкается и размыкается
-// десятки раз за миллисекунды. Поэтому новое состояние принимается только
-// после того, как продержалось windowMs — тогда серия даёт одно событие.
-struct Debounce {
-  bool stable[kCells];
-  bool candidate[kCells];
-  uint32_t sinceMs[kCells];
-};
-
 inline void debounceInit(Debounce& d) {
   for (int i = 0; i < kCells; ++i) {
     d.stable[i] = false;
@@ -88,12 +99,6 @@ inline void debounceUpdate(Debounce& d, const bool raw[kCells], uint32_t nowMs,
     stableOut[i] = d.stable[i];
   }
 }
-
-// Что изменилось между двумя проходами: бит i — клетка с индексом i.
-struct Changes {
-  uint16_t closed;
-  uint16_t opened;
-};
 
 // Сколько клеток занято — для сводки в serial: по числу видно, что схема
 // прочитала ровно столько фигур, сколько поставлено, без лишних клеток.

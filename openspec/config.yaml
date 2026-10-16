@@ -17,7 +17,7 @@ context: |
   Команды этого проекта (используй именно их):
     make setup        — поставить brew-зависимости (Brewfile); make doctor — проверить окружение
     make lint         — cppcheck + схема + config.yaml + workflow + актуальность производных файлов (быстро, без сборки)
-    make check        — то же + native-тесты + сборка прошивки (автоматически находит pio: venv или из PATH)
+    make check        — то же + компиляция sketch.ino + native-тесты + сборка прошивки (автоматически находит pio: venv или из PATH)
     make build        — только сборка прошивки
     make test         — native-тесты чистой логики (pio test -e native, на хосте, без платы и токена)
     make sketch       — пересобрать sketch.ino из src/
@@ -83,7 +83,7 @@ operations:
     guidance:
       - "Сначала прочитай AGENTS.md и docs/SDD-WORKFLOW.md."
       - "Выполняй задачи по порядку и отмечай - [x] только после успешной проверки этой задачи."
-      - "Быстрая локальная проверка после правок: make check (cppcheck + схема + config.yaml + workflow + sketch.ino + native-тесты + сборка)."
+      - "Быстрая локальная проверка после правок: make check (cppcheck + схема + config.yaml + workflow + компиляция sketch.ino + native-тесты + сборка)."
       - "Правка только документации или OpenSpec-артефактов: make check избыточен, достаточно make lint."
       - "Перед отчётом о готовности: npx @fission-ai/openspec@latest validate <change> --strict должен проходить."
       - "Поведение (blink.test.yaml) проверяется прогоном сценария: локально — make sim, если WOKWI_CLI_TOKEN есть в окружении, иначе Wokwi CI по push или симуляция в браузере. Токен не запрашивай и не печатай."

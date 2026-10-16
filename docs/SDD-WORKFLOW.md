@@ -107,7 +107,7 @@ npx @fission-ai/openspec@latest instructions apply --change <имя> --json
 operations:
   apply:
     guidance:
-      - "Быстрая локальная проверка после правок: make check (cppcheck + схема + config.yaml + workflow + сборка)."
+      - "Быстрая локальная проверка после правок: make check (cppcheck + схема + config.yaml + workflow + компиляция sketch.ino + native-тесты + сборка)."
       - "Правка только документации или OpenSpec-артефактов: make check избыточен, достаточно make lint."
       - "Перед отчётом о готовности: npx @fission-ai/openspec@latest validate <change> --strict должен проходить."
       - "Проверку поведения (blink.test.yaml) локально прогнать НЕЛЬЗЯ: нужен WOKWI_CLI_TOKEN, он есть только в GitHub Secrets."
@@ -440,7 +440,7 @@ npx @fission-ai/openspec@latest new change <имя>
 
 ```sh
 make lint    # cppcheck + схема + config.yaml + workflow + sketch.ino   (~10 секунд)
-make check   # lint + native-тесты + сборка прошивки
+make check   # lint + компиляция sketch.ino + native-тесты + сборка прошивки
 make sim     # прогон сценария в симуляторе Wokwi (нужен WOKWI_CLI_TOKEN в окружении)
 ```
 
@@ -467,6 +467,7 @@ make sim     # прогон сценария в симуляторе Wokwi (ну
 | Дефекты C++ | `make lint-cppcheck` (cppcheck) | да | — |
 | Схема | `make lint-diagram` (актуальность + `wokwi-cli lint`) | да | — |
 | `sketch.ino` | `make lint-sketch` (сверка с `src/`) | да | — |
+| `sketch.ino` компилируется | `make lint-sketch-compile` (тот же компилятор, что в редакторе) | да | — |
 | `openspec/config.yaml` | `make lint-yaml` | да | — |
 | Workflow | `make lint-workflow` (actionlint) | да | да |
 | **Юнит-тесты чистой логики** | `make test` (`pio test -e native`) | да | да |

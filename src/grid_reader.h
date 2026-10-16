@@ -24,6 +24,8 @@ constexpr uint8_t kCpPin = 5;  // CP: такт выдвижения
 constexpr uint8_t kQ7Pin = 6;  // Q7: последовательный выход последнего корпуса
 constexpr int kChips = 2;      // два 74HC165 в цепочке = 16 входов
 
+// ==== склейка: выше объявления, ниже функции ====
+
 inline void begin() {
   pinMode(kPlPin, OUTPUT);
   pinMode(kCpPin, OUTPUT);

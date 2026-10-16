@@ -19,6 +19,8 @@ struct State {
   uint32_t sinceMs;
 };
 
+// ==== склейка: выше объявления, ниже функции ====
+
 inline void init(State& s, uint32_t nowMs) {
   s.on = false;
   s.sinceMs = nowMs;

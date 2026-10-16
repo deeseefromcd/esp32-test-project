@@ -46,6 +46,9 @@ make setup      # поставить зависимости
 | `Brewfile` | brew-зависимости проекта: `actionlint`, `shellcheck` (`make setup`) |
 | `scripts/doctor.sh` | Проверка окружения: чего не хватает и как это ставить (`make doctor`) — читает `Brewfile` напрямую |
 | `scripts/check-openspec-config.rb` | Ловит дефект `openspec/config.yaml`, который `openspec validate` пропускает молча |
+| `scripts/gen-diagram.rb` | Собирает `diagram.json` из описания (`make diagram`), проверяет описание и снимает раскладку (`--capture`) |
+| `scripts/bundle-sketch.rb` | Собирает `sketch.ino` из модулей `src/` в два слоя — иначе Arduino-компилятор вставляет прототипы раньше типов (`make sketch`, AGENTS.md §4.11) |
+| `scripts/check-sketch-compiles.sh` | Компилирует `sketch.ino` во временном проекте PlatformIO (`make lint-sketch-compile`, входит в `make check`) |
 | `AGENTS.md` | Инструкции для AI-агентов: обязательная синхронизация с wokwi.com, OpenSpec и обход известных проблем |
 | `docs/SDD-WORKFLOW.md` | Как ставить задачи через OpenSpec: шаблоны, разбор прошлой задачи, шпаргалка |
 | `openspec/` | Спецификации (SDD): `specs/` — актуальное поведение, `changes/` — предлагаемые изменения |

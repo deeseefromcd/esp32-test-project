@@ -44,6 +44,8 @@ grid::Debounce g_debounce;
 bool g_prev[grid::kCells];                   // состояние, о котором уже сообщили
 uint32_t g_lastPollMs = 0;
 
+// ==== склейка: выше объявления, ниже функции ====
+
 void printField(const bool cells[grid::kCells]) {
   char buf[128];
   Serial.print("grid: ");

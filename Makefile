@@ -14,7 +14,7 @@
 #   make sim     — прогнать сценарий в симуляторе Wokwi локально (нужен токен)
 #
 #   make lint    — все быстрые локальные проверки (cppcheck, схема, config.yaml, workflow, sketch.ino)
-#   make check   — lint + тесты + сборка (то, что прогоняет агент при правке)
+#   make check   — lint + компиляция sketch.ino для wokwi.com + тесты + сборка
 #
 # Пути к инструментам определяются автоматически, чтобы Makefile работал и на
 # других машинах. Переопределить можно из окружения или аргументом:
@@ -35,7 +35,7 @@ endif
 ENV ?= esp32-s3-devkitc-1
 ACTIONLINT ?= actionlint
 
-.PHONY: help setup doctor build test sketch clean size flash sim lint check lint-cppcheck lint-diagram lint-yaml lint-workflow lint-sketch diagram diagram-capture
+.PHONY: help setup doctor build test sketch clean size flash sim lint check lint-cppcheck lint-diagram lint-yaml lint-workflow lint-sketch lint-sketch-compile diagram diagram-capture
 
 help:
 	@echo "Доступные цели:"
@@ -51,7 +51,7 @@ help:
 	@echo "  make flash   — прошить плату"
 	@echo "  make sim     — локальный прогон сценария в симуляторе Wokwi"
 	@echo "  make lint    — cppcheck + схема + config.yaml + workflow + sketch.ino"
-	@echo "  make check   — lint, тесты и сборка (быстрая проверка перед коммитом)"
+	@echo "  make check   — lint, компиляция sketch.ino, тесты и сборка прошивки"
 	@echo ""
 	@echo "Используемый pio:       $(PIO)"
 	@echo "Используемый wokwi-cli: $(WOKWI_CLI)"
@@ -134,6 +134,12 @@ lint-sketch:
 	@echo "== sketch.ino (собран из src/) =="
 	@ruby scripts/bundle-sketch.rb --check
 
+# Отдельно от lint: это сборка, а не статическая проверка, и она проверяет
+# именно тот файл, который уезжает в редактор wokwi.com.
+lint-sketch-compile:
+	@echo "== sketch.ino (компилируется Arduino-окружением) =="
+	@PIO="$(PIO)" bash scripts/check-sketch-compiles.sh
+
 lint-cppcheck:
 	@echo "== cppcheck (pio check) =="
 	$(PIO) check -e $(ENV) --fail-on-defect medium --skip-packages
@@ -153,6 +159,6 @@ lint-workflow:
 		&& $(ACTIONLINT) .github/workflows/wokwi.yml \
 		|| echo "actionlint не установлен — шаг пропущен (make setup или brew install actionlint)"
 
-check: lint test build
+check: lint lint-sketch-compile test build
 	@echo ""
-	@echo "check: lint, тесты и сборка пройдены."
+	@echo "check: lint, компиляция sketch.ino, тесты и сборка прошивки пройдены."
