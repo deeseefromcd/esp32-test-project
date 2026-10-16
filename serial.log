@@ -10,30 +10,24 @@ entry 0x403c98ac
 ESP32-S3 reed grid started (GPIO48, 4x4)grid: 0 closed  A B C D
 1 . . . .2 . . . .
 3 . . . .
-4 . . . .LED ONLED OFFLED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
+4 . . . .LED ONLED OFFcell A1 closedgrid: 1 closed  A B C D
+1 X . . .2 . . . .
+3 . . . .
+4 . . . .
+cell C1 closedgrid: 2 closed  A B C D
+1 X . X .2 . . . .
+3 . . . .
+4 . . . .
+cell B1 closedcell A2 closedgrid: 4 closed  A B C D
+1 X X X .2 X . . .3 . . . .
+4 . . . .
+cell B2 closedgrid: 5 closed  A B C D
+1 X X X .
+2 X X . .3 . . . .
+4 . . . .
+cell D1 closedcell C2 closedcell D2 closedcell A3 closedcell B3 closedcell C3 closedcell D3 closedcell A4 closedcell B4 closedcell C4 closedcell D4 closedgrid: 16 closed  A B C D
+1 X X X X
+2 X X X X
+3 X X X X4 X X X Xcell A1 openedgrid: 15 closed
+  A B C D
+1 . X X X

@@ -27,33 +27,85 @@ LED ON
 LED OFF
 [Reed matrix stand test] Expected text matched: "LED OFF"
 [Reed matrix stand test] expect-pin led1:A == 0
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-LED OFF
-LED ON
-
-Timeout: simulation did not finish in 30000ms
-код возврата CLI: 42
+cell A1 closed
+[Reed matrix stand test] Expected text matched: "cell A1 closed"
+grid: 1 closed
+[Reed matrix stand test] Expected text matched: "grid: 1 closed"
+  A B C D
+1 X . . .
+[Reed matrix stand test] Expected text matched: "1 X . . ."
+2 . . . .
+3 . . . .
+4 . . . .
+cell C1 closed
+[Reed matrix stand test] Expected text matched: "cell C1 closed"
+grid: 2 closed
+[Reed matrix stand test] Expected text matched: "grid: 2 closed"
+  A B C D
+1 X . X .
+[Reed matrix stand test] Expected text matched: "1 X . X ."
+2 . . . .
+3 . . . .
+4 . . . .
+cell B1 closed
+[Reed matrix stand test] Expected text matched: "cell B1 closed"
+cell A2 closed
+[Reed matrix stand test] Expected text matched: "cell A2 closed"
+grid: 4 closed
+[Reed matrix stand test] Expected text matched: "grid: 4 closed"
+  A B C D
+1 X X X .
+[Reed matrix stand test] Expected text matched: "1 X X X ."
+2 X . . .
+[Reed matrix stand test] Expected text matched: "2 X . . ."
+3 . . . .
+4 . . . .
+cell B2 closed
+[Reed matrix stand test] Expected text matched: "cell B2 closed"
+grid: 5 closed
+[Reed matrix stand test] Expected text matched: "grid: 5 closed"
+  A B C D
+1 X X X .
+2 X X . .
+[Reed matrix stand test] Expected text matched: "2 X X . ."
+3 . . . .
+4 . . . .
+cell D1 closed
+[Reed matrix stand test] Expected text matched: "cell D1 closed"
+cell C2 closed
+[Reed matrix stand test] Expected text matched: "cell C2 closed"
+cell D2 closed
+[Reed matrix stand test] Expected text matched: "cell D2 closed"
+cell A3 closed
+[Reed matrix stand test] Expected text matched: "cell A3 closed"
+cell B3 closed
+[Reed matrix stand test] Expected text matched: "cell B3 closed"
+cell C3 closed
+[Reed matrix stand test] Expected text matched: "cell C3 closed"
+cell D3 closed
+[Reed matrix stand test] Expected text matched: "cell D3 closed"
+cell A4 closed
+[Reed matrix stand test] Expected text matched: "cell A4 closed"
+cell B4 closed
+[Reed matrix stand test] Expected text matched: "cell B4 closed"
+cell C4 closed
+[Reed matrix stand test] Expected text matched: "cell C4 closed"
+cell D4 closed
+[Reed matrix stand test] Expected text matched: "cell D4 closed"
+grid: 16 closed
+[Reed matrix stand test] Expected text matched: "grid: 16 closed"
+  A B C D
+1 X X X X
+2 X X X X
+3 X X X X
+[Reed matrix stand test] Expected text matched: "3 X X X X"
+4 X X X X
+[Reed matrix stand test] Expected text matched: "4 X X X X"
+cell A1 opened
+[Reed matrix stand test] Expected text matched: "cell A1 opened"
+grid: 15 closed
+  A B C D
+1 . X X X
+[Reed matrix stand test] Expected text matched: "1 . X X X"
+[Reed matrix stand test] Scenario completed successfully
+код возврата CLI: 0
