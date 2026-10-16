@@ -4,13 +4,15 @@
 #   make doctor  — проверить окружение: чего не хватает и как это ставить
 #
 #   make build   — собрать прошивку (pio run)
+#   make test    — прогнать native-тесты чистой логики (pio test -e native)
+#   make sketch  — пересобрать sketch.ino из src/ для wokwi.com
 #   make clean   — очистить сборку
 #   make size    — показать размер прошивки
 #   make flash   — прошить подключённую плату (pio run -t upload)
 #   make sim     — подсказка, как запустить симулятор Wokwi
 #
-#   make lint    — все быстрые локальные проверки (cppcheck, схема, config.yaml, workflow)
-#   make check   — lint + сборка (то, что прогоняет агент при правке)
+#   make lint    — все быстрые локальные проверки (cppcheck, схема, config.yaml, workflow, sketch.ino)
+#   make check   — lint + тесты + сборка (то, что прогоняет агент при правке)
 #
 # Пути к инструментам определяются автоматически, чтобы Makefile работал и на
 # других машинах. Переопределить можно из окружения или аргументом:
@@ -31,19 +33,21 @@ endif
 ENV ?= esp32-s3-devkitc-1
 ACTIONLINT ?= actionlint
 
-.PHONY: help setup doctor build clean size flash sim lint check lint-cppcheck lint-diagram lint-yaml lint-workflow
+.PHONY: help setup doctor build test sketch clean size flash sim lint check lint-cppcheck lint-diagram lint-yaml lint-workflow lint-sketch
 
 help:
 	@echo "Доступные цели:"
 	@echo "  make setup   — поставить brew-зависимости (brew bundle)"
 	@echo "  make doctor  — проверить окружение (чего не хватает)"
 	@echo "  make build   — собрать прошивку"
+	@echo "  make test    — native-тесты чистой логики"
+	@echo "  make sketch  — пересобрать sketch.ino из src/"
 	@echo "  make clean   — очистить сборку"
 	@echo "  make size    — размер прошивки"
 	@echo "  make flash   — прошить плату"
 	@echo "  make sim     — как запустить симулятор Wokwi"
-	@echo "  make lint    — cppcheck + схема + config.yaml + workflow + зависимости"
-	@echo "  make check   — lint и сборка (быстрая проверка перед коммитом)"
+	@echo "  make lint    — cppcheck + схема + config.yaml + workflow + sketch.ino"
+	@echo "  make check   — lint, тесты и сборка (быстрая проверка перед коммитом)"
 	@echo ""
 	@echo "Используемый pio:       $(PIO)"
 	@echo "Используемый wokwi-cli: $(WOKWI_CLI)"
@@ -67,6 +71,13 @@ setup:
 build:
 	$(PIO) run
 
+test:
+	@echo "== native-тесты чистой логики =="
+	$(PIO) test -e native
+
+sketch:
+	@ruby scripts/bundle-sketch.rb
+
 clean:
 	$(PIO) run -t clean
 
@@ -89,9 +100,13 @@ sim: build
 # ("setup/loop is never used" — их вызывает фреймворк), а medium и выше ловит
 # настоящие дефекты.
 
-lint: lint-cppcheck lint-diagram lint-yaml lint-workflow
+lint: lint-cppcheck lint-diagram lint-yaml lint-workflow lint-sketch
 	@echo ""
 	@echo "Все локальные проверки пройдены."
+
+lint-sketch:
+	@echo "== sketch.ino (собран из src/) =="
+	@ruby scripts/bundle-sketch.rb --check
 
 lint-cppcheck:
 	@echo "== cppcheck (pio check) =="
@@ -111,6 +126,6 @@ lint-workflow:
 		&& $(ACTIONLINT) .github/workflows/wokwi.yml \
 		|| echo "actionlint не установлен — шаг пропущен (make setup или brew install actionlint)"
 
-check: lint build
+check: lint test build
 	@echo ""
-	@echo "check: lint и сборка пройдены."
+	@echo "check: lint, тесты и сборка пройдены."
