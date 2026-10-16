@@ -5,11 +5,18 @@
 # соединено), tools/diagram/layout.json (где стоит и как разведено) и
 # tools/diagram/parts.json (смещения выводов деталей).
 #
-# Зачем: в diagram.json связь задаётся именем отверстия макетной платы, а не
-# координатой. Руками такие имена не удержать — шестнадцать кнопок, шестнадцать
-# подтяжек и два корпуса дают больше сотни соединений, и любая правка топологии
-# сдвигает их все. Здесь координаты выводов считаются из геометрии деталей,
-# имена отверстий подставляются по координатам, а топология остаётся читаемой.
+# Зачем: провод в diagram.json — это пара «деталь:вывод», а координат выводов в
+# описании схемы нет. Шестнадцать кнопок, шестнадцать подтяжек и два корпуса дают
+# десятки проводов, и держать их руками нечем: правка топологии меняет точки, к
+# которым тянутся провода. Здесь координаты считаются из геометрии деталей,
+# порядок проводов в сети — по раскладке, а топология остаётся читаемой.
+#
+# Проверки, которые генератор делает за описанием (ошибка — выход с кодом 1):
+#   * каждый вывод детали участвует не больше чем в одной сети;
+#   * каждая клетка поля описана ровно в одном корпусе;
+#   * у сигнального и земляного контактов кнопки один и тот же вывод (иначе
+#     клетка замыкается сама на себя);
+#   * у каждой детали есть координата — правило раскладки или посадка.
 #
 # Запуск:
 #   ruby scripts/gen-diagram.rb            — перезаписать diagram.json
@@ -24,14 +31,6 @@ DIAGRAM_DIR = ROOT.join('tools', 'diagram')
 OUT = ROOT.join('diagram.json')
 AUTHOR = 'deeseefromcd'
 
-# Допуск посадки: редактор Wokwi сам соединяет вывод с отверстием, если они
-# ближе 2 px. Генератор берёт тот же допуск, поэтому нарисованная схема и
-# объявленные соединения совпадают.
-TOLERANCE = 2.0
-
-GRID_HOLE = /\A(\d+)([tb])\.([a-j])\z/
-RAIL_HOLE = /\A(tp|tn|bp|bn)\.(\d+)\z/
-
 def die(message)
   warn "gen-diagram: #{message}"
   exit 1
@@ -43,172 +42,94 @@ rescue JSON::ParserError => e
   die "#{path} не разбирается: #{e.message}"
 end
 
-# Макетная плата: сетка отверстий и шины питания.
-class Board
-  attr_reader :id, :type, :left, :top, :attrs
-
-  def initialize(id, spec, geometry)
-    @id = id
-    @type = spec.fetch('type')
-    @left = spec['at'][0]
-    @top = spec['at'][1]
-    @attrs = spec.fetch('attrs', {})
-    @grid = geometry.fetch('parts').fetch(@type).fetch('grid')
-  end
-
-  def columns
-    @grid['columns']
-  end
-
-  def rails
-    @grid['rails']
-  end
-
-  # Координата отверстия в системе схемы.
-  def hole_xy(hole)
-    if (m = GRID_HOLE.match(hole))
-      [@left + @grid['x0'] + (m[1].to_i - 1) * @grid['columnsX'], @top + @grid['rowsY'].fetch(m[3])]
-    elsif (m = RAIL_HOLE.match(hole))
-      rail = rails.fetch(m[1])
-      [@left + rail['x0'] + (m[2].to_i - 1) * @grid['columnsX'], @top + rail['y']]
-    else
-      die "отверстие #{@id}:#{hole} не разобрать"
-    end
-  end
-
-  # Электрическая точка отверстия: колонка целиком не проводит, проводят её
-  # половины (a..e и f..j), а шина проводит по всей длине.
-  def node_of(hole)
-    if (m = GRID_HOLE.match(hole))
-      "#{@id}##{m[1]}#{m[2]}"
-    elsif (m = RAIL_HOLE.match(hole))
-      "#{@id}##{m[1]}"
-    else
-      die "отверстие #{@id}:#{hole} не разобрать"
-    end
-  end
-
-  def holes_of(node)
-    kind = node.split('#', 2).last
-    if RAIL_HOLE.match("#{kind}.1")
-      rail = rails.fetch(kind)
-      (1..rail['count']).map { |n| "#{kind}.#{n}" }
-    else
-      m = kind.match(/\A(\d+)([tb])\z/) || die("точка #{node} не разобрать")
-      rows = m[2] == 't' ? @grid['topRows'] : @grid['bottomRows']
-      rows.map { |row| "#{m[1]}#{m[2]}.#{row}" }
-    end
-  end
-
-  # Ближайшее отверстие к точке — если оно ближе допуска, иначе nil.
-  def hole_at(x, y)
-    best = candidates(x, y).min_by do |hole|
-      hx, hy = hole_xy(hole)
-      Math.hypot(hx - x, hy - y)
-    end
-    return nil if best.nil?
-
-    hx, hy = hole_xy(best)
-    Math.hypot(hx - x, hy - y) <= TOLERANCE ? best : nil
-  end
-
-  def nearest_hole(holes, x, y)
-    holes.min_by do |hole|
-      hx, hy = hole_xy(hole)
-      Math.hypot(hx - x, hy - y)
-    end
-  end
-
-  private
-
-  # Кандидаты: три колонки вокруг x во всех десяти рядах и по одному отверстию
-  # на каждую шину. Перебирать все 830 отверстий платы не нужно.
-  def candidates(x, y)
-    out = []
-    col = ((x - @left - @grid['x0']) / @grid['columnsX']).round + 1
-    [col - 1, col, col + 1].each do |c|
-      next if c < 1 || c > columns
-
-      @grid['topRows'].each { |row| out << "#{c}t.#{row}" }
-      @grid['bottomRows'].each { |row| out << "#{c}b.#{row}" }
-    end
-    rails.each do |name, spec|
-      n = ((x - @left - spec['x0']) / @grid['columnsX']).round + 1
-      out << "#{name}.#{n}" if n >= 1 && n <= spec['count']
-    end
-    out
-  end
-end
-
 # Деталь схемы: положение, поворот и смещения выводов.
 class Part
-  attr_accessor :left, :top, :board
-  attr_reader :id, :type, :attrs, :rotate, :pins, :anchor
+  attr_accessor :left, :top
+  attr_reader :id, :type, :attrs, :rotate, :pins
 
-  def initialize(id:, type:, attrs:, rotate:, pins:, anchor: nil)
+  def initialize(id:, type:, attrs:, rotate:, pins:)
     @id = id
     @type = type
     @attrs = attrs
     @rotate = rotate
     @pins = pins
-    @anchor = anchor
     @left = nil
     @top = nil
-    @board = nil
   end
 
-  def on_board?
-    !@board.nil?
+  def placed?
+    !@left.nil?
   end
 
   def point(pin)
-    dx, dy = @pins.fetch(pin) { die "у детали #{@id} нет вывода #{pin}" }
-    [@left + dx, @top + dy]
+    die "у детали #{@id} нет вывода #{pin}" unless @pins.key?(pin)
+    die "деталь #{@id} не поставлена" unless placed?
+
+    [@left + @pins[pin][0], @top + @pins[pin][1]]
   end
 
-  # Ставит деталь так, чтобы её якорный вывод попал в заданное отверстие.
-  def place(board, pin, hole)
-    dx, dy = @pins.fetch(pin) { die "у детали #{@id} нет якорного вывода #{pin}" }
-    hx, hy = board.hole_xy(hole)
-    @board = board
-    @left = hx - dx
-    @top = hy - dy
+  # Ставит деталь так, чтобы указанный вывод попал в заданную точку.
+  def place(pin, x, y)
+    die "у детали #{@id} нет вывода #{pin}" unless @pins.key?(pin)
+
+    place_left_top(x - @pins[pin][0], y - @pins[pin][1])
   end
 
-  def place_free(left, top)
-    @left = left
-    @top = top
+  def place_left_top(x, y)
+    @left = x
+    @top = y
   end
 end
 
 # Схема: детали, соединения и всё, что нужно для их вывода.
 class Diagram
-  attr_reader :boards, :parts, :connections
+  attr_reader :parts, :connections
 
   def initialize(topology, layout, geometry)
     @topology = topology
     @layout = layout
     @geometry = geometry
-    @boards = build_boards
     @parts = []
     @connections = []
-    @extra_nets = []
+    @cells = build_cells
     build_parts
     build_wiring
+    check_placement
   end
 
   private
 
-  def build_boards
-    @layout.fetch('boards').map { |id, spec| Board.new(id, spec, @geometry) }
+  # --- описание ------------------------------------------------------------
+
+  def grid
+    @topology.fetch('grid')
   end
 
-  def board(id)
-    @boards.find { |b| b.id == id } || die("в layout.json нет платы #{id}")
+  # Клетки поля в порядке строк и столбцов: [[имя, id корпуса, вход], ...].
+  def build_cells
+    chips = @topology.fetch('shiftRegisters').fetch('chain')
+    out = []
+    (1..grid.fetch('rows')).each do |row|
+      ('A'.ord..('A'.ord + grid.fetch('cols') - 1)).map(&:chr).each do |col|
+        cell = "#{col}#{row}"
+        found = chips.map do |chip|
+          index = chip.fetch('cells').index(cell)
+          [chip.fetch('id'), "D#{index}"] if index
+        end.compact
+        die "клетка #{cell} описана в #{found.size} корпусах, а должна ровно в одном" if found.size != 1
+
+        out << [cell, found[0][0], found[0][1]]
+      end
+    end
+    out
   end
 
-  def board_part?(id)
-    @boards.any? { |b| b.id == id }
+  def part_id(kind, cell)
+    case kind
+    when 'button' then "#{grid.dig('button', 'id_prefix')}#{cell}"
+    when 'pullup' then "#{grid.dig('pullup', 'id_prefix')}#{cell}"
+    else die "неизвестный вид детали клетки: #{kind}"
+    end
   end
 
   def pins_for(type, rotate)
@@ -220,123 +141,171 @@ class Diagram
     end
   end
 
+  # Поворот детали: правило раскладки, а если правку сняли из редактора — её.
+  def rotate_for(id, default)
+    @layout.dig('placements', id, 'rotate') || default
+  end
+
+  # --- сборка --------------------------------------------------------------
+
   def build_parts
-    @boards.each do |b|
-      part = Part.new(id: b.id, type: b.type, attrs: b.attrs, rotate: 0, pins: {})
-      part.place_free(b.left, b.top)
-      add_part(part)
+    esp = @topology.fetch('board')
+    add_part(Part.new(id: esp['id'], type: esp['type'], attrs: esp['attrs'], rotate: 0,
+                      pins: pins_for(esp['type'], 0)))
+    @topology.fetch('shiftRegisters').fetch('chain').each do |chip|
+      add_part(Part.new(id: chip['id'], type: chip['type'], attrs: chip['attrs'], rotate: 0,
+                        pins: pins_for(chip['type'], 0)))
     end
-    board_spec = @topology.fetch('board')
-    add_part(Part.new(id: board_spec['id'], type: board_spec['type'], attrs: board_spec['attrs'],
-                      rotate: 0, pins: pins_for(board_spec['type'], 0)))
-    indicator = @topology.fetch('indicator')
-    add_part(Part.new(id: indicator['led']['id'], type: indicator['led']['type'],
-                      attrs: indicator['led']['attrs'], rotate: 0,
-                      pins: pins_for(indicator['led']['type'], 0)))
-    add_part(Part.new(id: indicator['resistor']['id'], type: indicator['resistor']['type'],
-                      attrs: indicator['resistor']['attrs'], rotate: 90,
-                      pins: pins_for(indicator['resistor']['type'], 90)))
-    @topology.fetch('shiftRegisters').fetch('chain').each_with_index do |chip_spec, index|
-      build_chip(chip_spec, index)
-    end
-    apply_free_rules
+    led = @topology.fetch('indicator').fetch('led')
+    add_part(Part.new(id: led['id'], type: led['type'], attrs: led['attrs'], rotate: 0,
+                      pins: pins_for(led['type'], 0)))
+    resistor = @topology.fetch('indicator').fetch('resistor')
+    add_part(Part.new(id: resistor['id'], type: resistor['type'], attrs: resistor['attrs'],
+                      rotate: rotate_for(resistor['id'], 90), pins: pins_for(resistor['type'], 90)))
+    build_field
+    apply_rules
     apply_placements
   end
 
-  # Свободные детали (плата управления, светодиод, резистор) стоят вне макетной
-  # платы: им задаётся координата, а не отверстие.
-  def apply_free_rules
-    @layout.fetch('rules', {}).fetch('free', {}).each do |id, spec|
-      part = @parts.find { |p| p.id == id } || die("в layout.json есть свободная деталь #{id}, которой нет в топологии")
-      part.place_free(spec['at'][0], spec['at'][1])
-    end
-  end
-  # Корпус регистра: якорь — вывод PL, он садится в нижний ряд f левой колонки.
-  # Смещения выводов задают, в какой колонке и в какой половине платы оказался
-  # каждый вход D0..D7, поэтому карта «клетка → вход» проверяется геометрией.
-  def build_chip(chip_spec, index)
-    rule = @layout.dig('rules', 'chips', chip_spec['id']) ||
-           die("в layout.json нет правила посадки для #{chip_spec['id']}")
-    chip = Part.new(id: chip_spec['id'], type: chip_spec['type'], attrs: chip_spec['attrs'],
-                    rotate: 0, pins: pins_for(chip_spec['type'], 0), anchor: 'PL')
-    add_part(chip)
-    chip.place(board(rule['board']), 'PL', "#{rule['column']}b.f")
-
-    buttons = @layout.dig('rules', 'buttons')
-    grid = @topology.fetch('grid')
-    chip_spec.fetch('cells').each_with_index do |cell, i|
-      input = "D#{i}"
-      column = rule['column'] + column_offset(chip, input)
-      half = input_half(chip, input)
-      button = Part.new(id: "#{grid['button']['id_prefix']}#{cell}", type: grid['button']['type'],
-                        attrs: grid['button']['attrs'].transform_values { |v| v.to_s.gsub('<cell>', cell).gsub('<row-color>', grid['rowColors'].fetch(cell[1])) },
-                        rotate: 90, pins: pins_for(grid['button']['type'], 90), anchor: '1.l')
-      button.place(board(rule['board']), '1.l', "#{buttons['firstColumn'] + i * buttons['step']}t.b")
+  # Матрица поля: кнопка клетки — в своей строке и столбце, подтяжка — рядом.
+  def build_field
+    field = @layout.dig('rules', 'field') || die('в layout.json нет rules.field')
+    cells_spec = @topology.fetch('cells')
+    ox, oy = field.fetch('origin')
+    step_x, step_y = field.fetch('step')
+    offset_x, offset_y = field.fetch('pullupOffset')
+    @cells.each_with_index do |(cell, _chip, _input), index|
+      column = index % grid.fetch('cols')
+      row = index / grid.fetch('cols')
+      button = Part.new(id: part_id('button', cell), type: grid.dig('button', 'type'),
+                        attrs: render_attrs(grid.dig('button', 'attrs'), cell),
+                        rotate: rotate_for(part_id('button', cell), 90),
+                        pins: pins_for(grid.dig('button', 'type'), 90))
+      button.place_left_top(ox + column * step_x, oy + row * step_y)
       add_part(button)
-      pullup = Part.new(id: "#{grid['pullup']['id_prefix']}#{cell}", type: grid['pullup']['type'],
-                        attrs: grid['pullup']['attrs'], rotate: 90,
-                        pins: pins_for(grid['pullup']['type'], 90), anchor: half == 't' ? '2' : '1')
-      pullup.place(board(rule['board']), pullup.anchor, half == 't' ? "#{column}t.c" : "#{column}b.g")
+
+      signal_x, signal_y = button.point(cells_spec.fetch('signalPin'))
+      pullup = Part.new(id: part_id('pullup', cell), type: grid.dig('pullup', 'type'),
+                        attrs: grid.dig('pullup', 'attrs'),
+                        rotate: rotate_for(part_id('pullup', cell), 90),
+                        pins: pins_for(grid.dig('pullup', 'type'), 90))
+      pullup.place(cells_spec.fetch('pullupPin'), signal_x + offset_x, signal_y + offset_y)
       add_part(pullup)
-      @extra_nets << cell_net(cell, chip, input, button, pullup, half)
-      @extra_nets << cell_ground_net(cell, button, half, rule['board'])
     end
   end
 
-  # Колонка входа считается по смещению вывода от PL: одна колонка — 9.6 px.
-  def column_offset(chip, pin)
-    pitch = @geometry.fetch('pitch')
-    ((chip.pins.fetch(pin)[0] - chip.pins.fetch('PL')[0]) / pitch).round
-  end
-
-  # Половина платы, в которую попал вывод: верхний ряд корпуса ложится на ряд e,
-  # нижний — на ряд f.
-  def input_half(chip, pin)
-    chip.pins.fetch(pin)[1] < 15 ? 't' : 'b'
-  end
-
-  # Явная посадка из layout.json перекрывает правила: так правки, сделанные в
-  # редакторе и снятые make diagram-capture, не теряются при перегенерации.
-  def apply_placements
-    @layout.fetch('placements', {}).each do |id, spec|
-      next if board_part?(id)
-
-      part = @parts.find { |p| p.id == id } || die("в layout.json есть посадка неизвестной детали #{id}")
-      if spec.key?('board')
-        part.place(board(spec['board']), part.anchor || die("у детали #{id} нет якорного вывода"),
-                   spec['hole'])
-      else
-        part.place_free(spec['at'][0], spec['at'][1])
-      end
+  def render_attrs(attrs, cell)
+    attrs.transform_values do |value|
+      value.to_s.gsub('<cell>', cell).gsub('<row-color>', grid.fetch('rowColors').fetch(cell[1]))
     end
   end
 
   def add_part(part)
     die "деталь #{part.id} описана дважды" if @parts.any? { |p| p.id == part.id }
+
     @parts << part
     part
+  end
+
+  # Координаты деталей, которым не нужно место в матрице поля.
+  def apply_rules
+    @layout.fetch('rules').fetch('at', {}).each do |id, at|
+      part(@parts, id).place_left_top(at[0], at[1])
+    end
+  end
+
+  # Посадка из layout.json перекрывает правила: так правки, сделанные мышью в
+  # редакторе и снятые make diagram-capture, не теряются при перегенерации.
+  def apply_placements
+    @layout.fetch('placements', {}).each do |id, spec|
+      part(@parts, id).place_left_top(spec['at'][0], spec['at'][1])
+    end
+  end
+
+  def part(parts, id)
+    parts.find { |p| p.id == id } || die("в layout.json есть координата неизвестной детали #{id}")
   end
 
   # --- соединения ----------------------------------------------------------
 
   def build_wiring
-    @parts.each do |part|
-      next unless part.on_board?
+    seen = {}
+    nets = @topology.fetch('nets').map { |net| expand(net) } + cell_nets
+    nets.each do |net|
+      net.fetch('members').each do |member|
+        if seen.key?(member)
+          die "вывод #{member} попал и в сеть #{seen[member]}, и в сеть #{net['name']}"
+        end
 
-      part.pins.each_key { |pin| declare(part, pin) }
+        seen[member] = net.fetch('name')
+      end
+      wire(net)
     end
-    nets = @topology.fetch('nets') + @extra_nets
-    nets.each { |net| wire(net) }
   end
 
-  # Вывод, стоящий в отверстии, объявляется соединённым с ним: иначе в схеме
-  # деталь нарисована на плате, а электрически к ней не подключена.
-  def declare(part, pin)
-    x, y = part.point(pin)
-    hole = part.board.hole_at(x, y) || die(
-      "вывод #{part.id}:#{pin} не попал в отверстие платы #{part.board.id} — перекалибруй parts.json"
-    )
-    add_connection("#{part.id}:#{pin}", "#{part.board.id}:#{hole}", '', ['$bb'])
+  # Сети питания и земли общие: их члены дополняются по одному выводу на клетку.
+  def expand(net)
+    per_cell = net.fetch('perCell', {})
+    return net if per_cell.empty?
+
+    members = net.fetch('members').dup
+    @cells.each do |cell, _chip, _input|
+      per_cell.each { |kind, pin| members << "#{part_id(kind, cell)}:#{pin}" }
+    end
+    net.merge('members' => members)
+  end
+
+  # Сеть клетки: сигнальный контакт кнопки, подтяжка и вход регистра.
+  def cell_nets
+    spec = @topology.fetch('cells')
+    if spec.fetch('signalPin') == spec.fetch('buttonGroundPin')
+      die "у кнопки сигнал и земля на одном выводе #{spec.fetch('signalPin')}"
+    end
+
+    @cells.map do |cell, chip, input|
+      { 'name' => "cell-#{cell}", 'color' => spec.fetch('color'),
+        'members' => ["#{part_id('button', cell)}:#{spec.fetch('signalPin')}",
+                      "#{part_id('pullup', cell)}:#{spec.fetch('pullupPin')}",
+                      "#{chip}:#{input}"] }
+    end
+  end
+
+  # Провода кладутся цепочкой: первым идёт вывод, записанный в описании первым
+  # (обычно вывод платы управления), дальше каждый раз ближайший неподключённый.
+  # Так провода короткие и не собираются пучком из одного вывода.
+  def wire(net)
+    order = chain_order(net.fetch('members').map { |member| resolve(member) })
+    order.each_cons(2) do |from, to|
+      add_connection(from[:endpoint], to[:endpoint], net.fetch('color', ''),
+                     default_route(from[:endpoint], to[:endpoint]))
+    end
+  end
+
+  def chain_order(members)
+    return members if members.size <= 2
+
+    order = [members.first]
+    rest = members[1..].dup
+    until rest.empty?
+      nearest = rest.min_by { |member| distance(order.last[:point], member[:point]) }
+      order << nearest
+      rest.delete(nearest)
+    end
+    order
+  end
+
+  def resolve(member)
+    return { endpoint: member, point: nil } if member.start_with?('$')
+
+    id, pin = member.split(':', 2)
+    found = @parts.find { |p| p.id == id } || die("соединение ссылается на неизвестную деталь #{id}")
+    { endpoint: member, point: found.point(pin) }
+  end
+
+  def distance(a, b)
+    return 0.0 if a.nil? || b.nil?
+
+    Math.hypot(a[0] - b[0], a[1] - b[1])
   end
 
   def add_connection(a, b, color, route)
@@ -346,110 +315,20 @@ class Diagram
     @connections << [a, b, color, stored || route]
   end
 
-  # Точка вывода: отверстие платы для детали на плате, сам вывод — для свободной.
-  def endpoint(part, pin)
-    if part.on_board?
-      x, y = part.point(pin)
-      hole = part.board.hole_at(x, y) || die("вывод #{part.id}:#{pin} не попал в отверстие")
-      { endpoint: "#{part.board.id}:#{hole}", node: part.board.node_of(hole), point: [x, y] }
-    else
-      { endpoint: "#{part.id}:#{pin}", node: "pin:#{part.id}:#{pin}", point: part.point(pin) }
-    end
-  end
-
-  def resolve_member(member)
-    id, pin = member.split(':', 2)
-    return { endpoint: member, node: "pin:#{member}", point: nil } if id.start_with?('$')
-
-    part = @parts.find { |p| p.id == id } || die("соединение ссылается на неизвестную деталь #{id}")
-    endpoint(part, pin)
-  end
-
-  # Провода кладутся от точки к точке. У шин питания есть hubs: каждая группа
-  # выводов тянется к ближайшему отверстию шины, а шины соединяются между собой,
-  # поэтому проводов мало и они короткие.
-  def wire(net)
-    members = net.fetch('members').map { |m| resolve_member(m) }
-    groups = {}
-    members.each do |m|
-      groups[m[:node]] ||= m
-    end
-    hubs = net.fetch('hubs', []).map { |h| hub_node(h) }
-    hubs = [groups.keys.first] if hubs.empty?
-
-    hubs.each_with_index do |node, i|
-      next if i.zero?
-
-      previous = hubs[0...i].flat_map { |n| hub_anchors(n, groups) }
-      seed = hub_anchors(node, groups).first
-      target = previous.min_by { |a| distance(a, seed) }
-      from = hub_anchors(node, groups).min_by { |a| distance(a, target) }
-      add_connection(from[:endpoint], target[:endpoint], net['color'],
-                     default_route(from[:endpoint], target[:endpoint]))
-    end
-
-    hub_points = hubs.flat_map { |n| hub_anchors(n, groups) }
-    groups.each do |node, group|
-      next if hubs.include?(node)
-
-      target = hub_points.min_by { |point| distance(point, group) }
-      add_connection(group[:endpoint], target[:endpoint], net['color'],
-                     default_route(group[:endpoint], target[:endpoint]))
-    end
-  end
-
-  def hub_node(ref)
-    kind, name = ref.split(':', 2)
-    die "шина #{ref} должна выглядеть как rail:bb1.tp" unless kind == 'rail'
-
-    board_id, rail = name.split('.', 2)
-    board(board_id).node_of("#{rail}.1")
-  end
-
-  # Кандидаты точки: все отверстия шины или колонки, либо сам вывод свободной детали.
-  def hub_anchors(node, groups)
-    board_id = node.split('#', 2).first
-    board = @boards.find { |b| b.id == board_id }
-    return [groups.fetch(node)] if board.nil?
-
-    board.holes_of(node).map do |hole|
-      { endpoint: "#{board.id}:#{hole}", point: board.hole_xy(hole) }
-    end
-  end
-
-  def distance(a, b)
-    return 0.0 if a[:point].nil? || b[:point].nil?
-
-    Math.hypot(a[:point][0] - b[:point][0], a[:point][1] - b[:point][1])
-  end
-
-  # Маршрут задаёт редактор (или пользователь): программа монитора — без
-  # маршрута, провод между выводами деталей — прямой, остальное ведёт
-  # маршрутизатор макетной платы.
+  # Маршрут: программа монитора — без маршрута, провод между выводами деталей —
+  # прямой. Маршрутов макетной платы здесь больше нет: плат в схеме нет.
   def default_route(a, b)
     return [] if a.start_with?('$') || b.start_with?('$')
 
-    board_ids = @boards.map(&:id)
-    on_hole = [a, b].any? { |endpoint| board_ids.include?(endpoint.split(':', 2).first) }
-    on_hole ? ['$bb'] : ['v0']
+    ['v0']
   end
 
-  # Сеть клетки: контакт кнопки и вход регистра — одна колонка платы. Берётся
-  # тот контакт кнопки, который лежит в той же половине платы, что и вход.
-  def cell_net(cell, chip, input, button, pullup, half)
-    # Шин здесь нет намеренно: сигнал клетки — это колонка кнопки, соединённая
-    # с колонкой входа регистра. У подтяжки берётся тот её вывод, который стоит
-    # в этой же колонке: второй вывод упирается в шину питания.
-    { 'name' => "cell-#{cell}", 'color' => 'green',
-      'members' => ["#{button.id}:#{half == 't' ? '1.l' : '1.r'}", "#{chip.id}:#{input}",
-                    "#{pullup.id}:#{pullup.anchor}"] }
-  end
+  def check_placement
+    @parts.each do |part|
+      next if part.placed?
 
-  # Земля кнопки: второй контакт тянется в шину земли той же половины.
-  def cell_ground_net(cell, button, half, board_id)
-    { 'name' => "gnd-#{cell}", 'color' => 'black',
-      'members' => ["#{button.id}:#{half == 't' ? '2.l' : '2.r'}"],
-      'hubs' => ["rail:#{board_id}.#{half == 't' ? 'tn' : 'bn'}"] }
+      die "у детали #{part.id} нет координаты — добавь её в rules.at или в rules.field"
+    end
   end
 
   public
@@ -460,8 +339,7 @@ class Diagram
     rounded = value.to_f.round(2)
     return rounded.round.to_s if (rounded - rounded.round).abs < 1e-9
 
-    formatted = format('%.2f', rounded)
-    formatted.sub(/0+\z/, '').sub(/\.\z/, '')
+    format('%.2f', rounded).sub(/0+\z/, '').sub(/\.\z/, '')
   end
 
   def normalize(value)
@@ -510,31 +388,17 @@ class Diagram
   # расстановку и разводку, сделанные в редакторе.
   def capture(diagram)
     placements = {}
-    @boards.each do |b|
-      part = diagram['parts'].find { |p| p['id'] == b.id } || next
-      @layout['boards'][b.id]['at'] = [normalize(part['left']), normalize(part['top'])]
-    end
     @parts.each do |part|
-      next if board_part?(part.id)
-
       source = diagram['parts'].find { |p| p['id'] == part.id } || next
       entry = { 'at' => [normalize(source['left']), normalize(source['top'])] }
-      entry['rotate'] = source['rotate'] if source.key?('rotate')
-      if part.on_board? && part.anchor
-        x = source['left'] + part.pins.fetch(part.anchor)[0]
-        y = source['top'] + part.pins.fetch(part.anchor)[1]
-        hole = part.board.hole_at(x, y)
-        if hole
-          entry = { 'board' => part.board.id, 'hole' => hole }
-        else
-          warn "gen-diagram: #{part.id} съехал с сетки — посадка сохранена координатами"
-        end
+      if source.key?('rotate') && source['rotate'] != part.rotate
+        entry['rotate'] = source['rotate']
       end
       placements[part.id] = entry
     end
     routes = {}
     diagram['connections'].each do |a, b, _color, route|
-      next if route.nil? || route.empty? || route == default_route(a, b) || (a.include?('$') || b.include?('$'))
+      next if route.nil? || route.empty? || route == default_route(a, b) || a.include?('$') || b.include?('$')
 
       routes["#{a}|#{b}"] = route
     end

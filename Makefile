@@ -11,7 +11,7 @@
 #   make clean   — очистить сборку
 #   make size    — показать размер прошивки
 #   make flash   — прошить подключённую плату (pio run -t upload)
-#   make sim     — подсказка, как запустить симулятор Wokwi
+#   make sim     — прогнать сценарий в симуляторе Wokwi локально (нужен токен)
 #
 #   make lint    — все быстрые локальные проверки (cppcheck, схема, config.yaml, workflow, sketch.ino)
 #   make check   — lint + тесты + сборка (то, что прогоняет агент при правке)
@@ -49,7 +49,7 @@ help:
 	@echo "  make clean   — очистить сборку"
 	@echo "  make size    — размер прошивки"
 	@echo "  make flash   — прошить плату"
-	@echo "  make sim     — как запустить симулятор Wokwi"
+	@echo "  make sim     — локальный прогон сценария в симуляторе Wokwi"
 	@echo "  make lint    — cppcheck + схема + config.yaml + workflow + sketch.ino"
 	@echo "  make check   — lint, тесты и сборка (быстрая проверка перед коммитом)"
 	@echo ""
@@ -97,12 +97,28 @@ size:
 flash:
 	$(PIO) run -t upload
 
+# Локальный прогон сценария: бесплатный тариф Wokwi даёт 50 минут симуляции на
+# 30 дней, поэтому длинный сценарий дешевле гонять здесь, а CI держать коротким.
+# Нужен только WOKWI_CLI_TOKEN в окружении; токена нет — подсказываем VS Code.
+SCENARIO ?= blink.test.yaml
+SERIAL_LOG ?= serial.log
+
 sim: build
-	@echo ""
-	@echo "Прошивка собрана: .pio/build/$(ENV)/firmware.bin"
-	@echo "Запусти симулятор Wokwi из VS Code:"
-	@echo "  1) открой папку проекта в VS Code"
-	@echo "  2) нажми F1 -> 'Wokwi: Start Simulator'"
+	@if [ -n "$$WOKWI_CLI_TOKEN" ]; then \
+		echo "== симуляция Wokwi: $(SCENARIO) =="; \
+		$(WOKWI_CLI) --scenario $(SCENARIO) --timeout 120000 --serial-log-file $(SERIAL_LOG) . ; \
+		status=$$?; \
+		echo ""; \
+		echo "serial: $(SERIAL_LOG)"; \
+		exit $$status; \
+	else \
+		echo ""; \
+		echo "WOKWI_CLI_TOKEN не задан — локальный прогон пропущен."; \
+		echo "Прошивка собрана: .pio/build/$(ENV)/firmware.bin"; \
+		echo "Запусти симулятор Wokwi из VS Code:"; \
+		echo "  1) открой папку проекта в VS Code"; \
+		echo "  2) нажми F1 -> 'Wokwi: Start Simulator'"; \
+	fi
 
 # ---- Проверки -------------------------------------------------------------
 #

@@ -85,6 +85,14 @@ steps:
       control: pressed
       value: 1
   - set-control:
+      part-id: btn_C2
+      control: pressed
+      value: 1
+  - set-control:
+      part-id: btn_D2
+      control: pressed
+      value: 1
+  - set-control:
       part-id: btn_A3
       control: pressed
       value: 1
@@ -116,8 +124,9 @@ steps:
       part-id: btn_D4
       control: pressed
       value: 1
-  - wait-serial: 'grid: 16 closed'
   - wait-serial: 'cell D1 closed'
+  - wait-serial: 'cell C2 closed'
+  - wait-serial: 'cell D2 closed'
   - wait-serial: 'cell A3 closed'
   - wait-serial: 'cell B3 closed'
   - wait-serial: 'cell C3 closed'
@@ -126,6 +135,7 @@ steps:
   - wait-serial: 'cell B4 closed'
   - wait-serial: 'cell C4 closed'
   - wait-serial: 'cell D4 closed'
+  - wait-serial: 'grid: 16 closed'
   - wait-serial: '3 X X X X'
   - wait-serial: '4 X X X X'
 

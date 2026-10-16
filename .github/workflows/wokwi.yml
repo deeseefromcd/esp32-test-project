@@ -32,6 +32,10 @@ jobs:
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
 
+      # Чистая логика проверяется на хосте: без платы, без токена и за секунды.
+      - name: Native tests
+        run: pio test -e native
+
       - name: Build PlatformIO project
         run: pio run
 
