@@ -1,8 +1,11 @@
-# Конфигурация для Wokwi for VS Code / Wokwi CLI.
-# Пути указывают на результат сборки PlatformIO (pio run).
-# На wokwi.com этот файл не нужен — там компиляция идёт в облаке.
-
+# Конфигурация симуляции для wokwi-cli (он же — шаг «Test with Wokwi» в CI).
+#
+# Симулируем ту самую прошивку, которую собирает PlatformIO, а не отдельную
+# сборку sketch.ino: во-первых, так проверяется рабочий бинарник, во-вторых,
+# единственный файл sketch.ino существует только ради веб-редактора wokwi.com
+# (там у загрузки прошивки нет альтернативы), и его авто-прототипы Arduino —
+# не тот путь, по которому стоит проверять код. Подробности: AGENTS.md, §4.10.
 [wokwi]
 version = 1
-firmware = '.pio/build/esp32-s3-devkitc-1/firmware.bin'
-elf = '.pio/build/esp32-s3-devkitc-1/firmware.elf'
+firmware = ".pio/build/esp32-s3-devkitc-1/firmware.bin"
+elf = ".pio/build/esp32-s3-devkitc-1/firmware.elf"

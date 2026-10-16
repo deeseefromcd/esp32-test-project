@@ -76,6 +76,59 @@ steps:
   - wait-serial: 'grid: 5 closed'
   - wait-serial: '2 X X . .'
 
+  # Все шестнадцать клеток: у каждой кнопки свой вход регистра, поэтому каждая
+  # обязана сообщить своё имя. Это проверка разводки всей сетки, а не только тех
+  # клеток, что нажимались раньше: перепутанный провод дал бы чужое имя, а общий
+  # вход — недобор в счётчике.
+  - set-control:
+      part-id: btn_D1
+      control: pressed
+      value: 1
+  - set-control:
+      part-id: btn_A3
+      control: pressed
+      value: 1
+  - set-control:
+      part-id: btn_B3
+      control: pressed
+      value: 1
+  - set-control:
+      part-id: btn_C3
+      control: pressed
+      value: 1
+  - set-control:
+      part-id: btn_D3
+      control: pressed
+      value: 1
+  - set-control:
+      part-id: btn_A4
+      control: pressed
+      value: 1
+  - set-control:
+      part-id: btn_B4
+      control: pressed
+      value: 1
+  - set-control:
+      part-id: btn_C4
+      control: pressed
+      value: 1
+  - set-control:
+      part-id: btn_D4
+      control: pressed
+      value: 1
+  - wait-serial: 'grid: 16 closed'
+  - wait-serial: 'cell D1 closed'
+  - wait-serial: 'cell A3 closed'
+  - wait-serial: 'cell B3 closed'
+  - wait-serial: 'cell C3 closed'
+  - wait-serial: 'cell D3 closed'
+  - wait-serial: 'cell A4 closed'
+  - wait-serial: 'cell B4 closed'
+  - wait-serial: 'cell C4 closed'
+  - wait-serial: 'cell D4 closed'
+  - wait-serial: '3 X X X X'
+  - wait-serial: '4 X X X X'
+
   # Снятие фигуры тоже видно в логе. Число здесь не проверяется: счётчик уже
   # проходил это значение раньше, а поле с освободившейся клеткой — нет.
   - set-control:
@@ -83,4 +136,4 @@ steps:
       control: pressed
       value: 0
   - wait-serial: 'cell A1 opened'
-  - wait-serial: '1 . X X .'
+  - wait-serial: '1 . X X X'

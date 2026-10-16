@@ -6,6 +6,9 @@ on:
     branches: [main, 'ci/**']
   pull_request:
 
+permissions:
+  contents: write  # нужен только шагу публикации логов на ветке проверки (см. ниже)
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -32,10 +35,43 @@ jobs:
       - name: Build PlatformIO project
         run: pio run
 
+      # Симулируется прошивка, собранная PlatformIO (см. wokwi.toml): это тот же
+      # бинарник, что собирается локально, а не отдельная сборка sketch.ino.
       - name: Test with Wokwi
+        if: github.ref != 'refs/heads/ci/reed-matrix-stand'
         uses: wokwi/wokwi-ci-action@v1
         with:
           token: ${{ secrets.WOKWI_CLI_TOKEN }}
           path: /
           timeout: 30000
           scenario: 'blink.test.yaml'
+
+      # На ветке проверки тот же прогон, но логи симуляции уезжают обратно в
+      # ветку: в логах GitHub их видит только вошедший, а разбирать падение
+      # приходится по serial. Шаг временный, вместе с веткой.
+      - name: Test with Wokwi (ветка проверки, с логами)
+        if: github.ref == 'refs/heads/ci/reed-matrix-stand'
+        env:
+          WOKWI_CLI_TOKEN: ${{ secrets.WOKWI_CLI_TOKEN }}
+          FORCE_COLOR: '0'
+        run: |
+          wget -q -O /usr/local/bin/wokwi-cli https://github.com/wokwi/wokwi-cli/releases/latest/download/wokwi-cli-linuxstatic-x64
+          chmod +x /usr/local/bin/wokwi-cli
+          rc=0
+          wokwi-cli --timeout 30000 --scenario blink.test.yaml \
+            --serial-log-file serial.log "$GITHUB_WORKSPACE" > wokwi-cli.log 2>&1 || rc=$?
+          echo "код возврата CLI: $rc" >> wokwi-cli.log
+          exit $rc
+
+      - name: Опубликовать логи прогона в ветку проверки
+        if: always() && github.ref == 'refs/heads/ci/reed-matrix-stand'
+        run: |
+          git config user.name "wokwi-ci"
+          git config user.email "wokwi-ci@localhost"
+          git add -f serial.log wokwi-cli.log || true
+          if git diff --cached --quiet; then
+            echo "новых логов нет"
+          else
+            git commit -m "ci: логи прогона [skip ci]"
+            git push
+          fi

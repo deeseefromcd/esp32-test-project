@@ -9,3 +9,6 @@ build/
 
 # macOS
 .DS_Store
+# логи прогона Wokwi (их публикует ветка проверки, локально не нужны)
+serial.log
+wokwi-cli.log
