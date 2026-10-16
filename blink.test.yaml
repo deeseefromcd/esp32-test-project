@@ -1,9 +1,26 @@
-name: Blinky test
+name: Reed matrix stand test
 version: 1
 author: deeseefromcd
 
+# Сценарий проверяет не только мигание, но и сетку: ставит «магниты» через
+# set-control и ждёт события в serial. Главная проверка независимости клеток —
+# строка «grid: N closed»: если бы замыкание одной клетки тянуло за собой
+# соседнюю, счётчик разошёлся бы с числом поставленных фигур.
+#
+# Число занятых клеток по ходу прогона только растёт (0, 1, 2, 4, 5), поэтому
+# каждое ожидаемое значение встречается в логе ровно один раз и проверка не
+# может «сойтись» на состоянии, которое было раньше.
+
 steps:
-  - wait-serial: 'ESP32-S3 blink started (GPIO48)'
+  - wait-serial: 'ESP32-S3 reed grid started (GPIO48, 4x4)'
+
+  # Без магнитов ни одна клетка не занята: промах посадки в отверстие или
+  # потерянная подтяжка дают здесь занятые клетки.
+  - wait-serial: 'grid: 0 closed'
+  - wait-serial: '1 . . . .'
+  - wait-serial: '4 . . . .'
+
+  # Светодиод мигает и управляет выводом GPIO48.
   - wait-serial: 'LED ON'
   - expect-pin:
       part-id: led1
@@ -14,3 +31,56 @@ steps:
       part-id: led1
       pin: A
       value: 0
+
+  # Один магнит: событие о своей клетке и поле с одной занятой клеткой.
+  - set-control:
+      part-id: btn_A1
+      control: pressed
+      value: 1
+  - wait-serial: 'cell A1 closed'
+  - wait-serial: 'grid: 1 closed'
+  - wait-serial: '1 X . . .'
+
+  # Несколько фигур одновременно: вторая клетка в той же строке.
+  - set-control:
+      part-id: btn_C1
+      control: pressed
+      value: 1
+  - wait-serial: 'cell C1 closed'
+  - wait-serial: 'grid: 2 closed'
+  - wait-serial: '1 X . X .'
+
+  # Три фигуры углом: A1, B1, A2. Четвёртая клетка прямоугольника — B2.
+  - set-control:
+      part-id: btn_B1
+      control: pressed
+      value: 1
+  - set-control:
+      part-id: btn_A2
+      control: pressed
+      value: 1
+  - wait-serial: 'cell B1 closed'
+  - wait-serial: 'cell A2 closed'
+  - wait-serial: 'grid: 4 closed'
+  - wait-serial: '1 X X X .'
+  - wait-serial: '2 X . . .'
+
+  # Четвёртая клетка угла была свободна: заняв её, получаем ровно пятое событие.
+  # Если бы её замкнуло фантомом, она была бы уже занята — события не было бы,
+  # и шаги ниже не дождались бы своих строк.
+  - set-control:
+      part-id: btn_B2
+      control: pressed
+      value: 1
+  - wait-serial: 'cell B2 closed'
+  - wait-serial: 'grid: 5 closed'
+  - wait-serial: '2 X X . .'
+
+  # Снятие фигуры тоже видно в логе. Число здесь не проверяется: счётчик уже
+  # проходил это значение раньше, а поле с освободившейся клеткой — нет.
+  - set-control:
+      part-id: btn_A1
+      control: pressed
+      value: 0
+  - wait-serial: 'cell A1 opened'
+  - wait-serial: '1 . X X .'

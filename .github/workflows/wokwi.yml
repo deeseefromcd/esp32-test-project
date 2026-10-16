@@ -3,7 +3,7 @@ name: Build and test on Wokwi
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, 'ci/**']
   pull_request:
 
 jobs:
@@ -37,5 +37,5 @@ jobs:
         with:
           token: ${{ secrets.WOKWI_CLI_TOKEN }}
           path: /
-          timeout: 20000
+          timeout: 30000
           scenario: 'blink.test.yaml'

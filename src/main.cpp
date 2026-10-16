@@ -23,6 +23,8 @@
     ESP32-S3 reed grid started (GPIO48, 4x4)
     LED ON / LED OFF
     cell A1 closed / cell A1 opened
+    grid: 3 closed — сколько клеток занято: по числу сценарий проверяет, что
+                    схема видит ровно поставленные фигуры
     поле в виде сетки (шапка A B C D, номера строк, X — занятая клетка)
 */
 
@@ -44,6 +46,9 @@ uint32_t g_lastPollMs = 0;
 
 void printField(const bool cells[grid::kCells]) {
   char buf[128];
+  Serial.print("grid: ");
+  Serial.print(grid::countClosed(cells));
+  Serial.println(" closed");
   grid::renderField(cells, buf, sizeof(buf));
   Serial.print(buf);
 }

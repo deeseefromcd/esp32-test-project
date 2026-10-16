@@ -104,6 +104,18 @@ struct Changes {
   uint16_t opened;
 };
 
+// Сколько клеток занято — для сводки в serial: по числу видно, что схема
+// прочитала ровно столько фигур, сколько поставлено, без лишних клеток.
+inline int countClosed(const bool cells[kCells]) {
+  int count = 0;
+  for (int i = 0; i < kCells; ++i) {
+    if (cells[i]) {
+      ++count;
+    }
+  }
+  return count;
+}
+
 inline Changes diff(const bool prev[kCells], const bool now[kCells]) {
   Changes ch{0, 0};
   for (int i = 0; i < kCells; ++i) {
@@ -204,6 +216,9 @@ inline bool update(State& s, uint32_t nowMs, uint32_t halfPeriodMs) {
     PL высокий — состояние выдвигается побитно через Q7 по импульсу CP.
   В цепочке Q7 предыдущего корпуса идёт на DS следующего, PL и CP общие,
   CE притянут к земле.
+
+  Входы притянуты к питанию, поэтому замкнутая клетка читается низким уровнем:
+  результат чтения инвертируется, и наружу выходит «карта замкнутых клеток».
 */
 
 #include <Arduino.h>
@@ -239,7 +254,11 @@ inline uint16_t readRaw() {
     digitalWrite(kCpPin, LOW);
     delayMicroseconds(1);
   }
-  return value;
+  // Замкнутая клетка сажает вход на землю, а разомкнутая держится подтяжкой на
+  // питании, поэтому занятая клетка читается низким уровнем. Инверсия стоит
+  // здесь, на границе с железом: в чистой логике единица означает «замкнуто»,
+  // иначе порядок бит в native-тестах читался бы шиворот-навыворот.
+  return static_cast<uint16_t>(~value);
 }
 
 }  // namespace grid_reader
@@ -270,6 +289,8 @@ inline uint16_t readRaw() {
     ESP32-S3 reed grid started (GPIO48, 4x4)
     LED ON / LED OFF
     cell A1 closed / cell A1 opened
+    grid: 3 closed — сколько клеток занято: по числу сценарий проверяет, что
+                    схема видит ровно поставленные фигуры
     поле в виде сетки (шапка A B C D, номера строк, X — занятая клетка)
 */
 
@@ -288,6 +309,9 @@ uint32_t g_lastPollMs = 0;
 
 void printField(const bool cells[grid::kCells]) {
   char buf[128];
+  Serial.print("grid: ");
+  Serial.print(grid::countClosed(cells));
+  Serial.println(" closed");
   grid::renderField(cells, buf, sizeof(buf));
   Serial.print(buf);
 }

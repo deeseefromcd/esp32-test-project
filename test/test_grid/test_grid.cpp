@@ -269,6 +269,23 @@ void test_blink_ignores_zero_period(void) {
   TEST_ASSERT_FALSE(s.on);
 }
 
+// --- Отрисовка поля --------------------------------------------------------
+
+void test_count_closed_counts_occupied_cells(void) {
+  bool cells[grid::kCells];
+  grid::rawToCells(0x0000, cells);
+  TEST_ASSERT_EQUAL_INT(0, grid::countClosed(cells));
+
+  grid::rawToCells(0x8000, cells);
+  TEST_ASSERT_EQUAL_INT(1, grid::countClosed(cells));
+
+  grid::rawToCells(0x8001, cells);
+  TEST_ASSERT_EQUAL_INT(2, grid::countClosed(cells));
+
+  grid::rawToCells(0xFFFF, cells);
+  TEST_ASSERT_EQUAL_INT(grid::kCells, grid::countClosed(cells));
+}
+
 int main(int argc, char** argv) {
   (void)argc;
   (void)argv;
@@ -288,6 +305,7 @@ int main(int argc, char** argv) {
   RUN_TEST(test_render_field_marks_occupied_cells);
   RUN_TEST(test_render_field_of_empty_grid);
   RUN_TEST(test_render_field_survives_small_buffer);
+  RUN_TEST(test_count_closed_counts_occupied_cells);
   RUN_TEST(test_blink_toggles_every_half_period);
   RUN_TEST(test_blink_ignores_zero_period);
   return UNITY_END();

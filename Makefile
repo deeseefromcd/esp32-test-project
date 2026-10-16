@@ -6,6 +6,8 @@
 #   make build   — собрать прошивку (pio run)
 #   make test    — прогнать native-тесты чистой логики (pio test -e native)
 #   make sketch  — пересобрать sketch.ino из src/ для wokwi.com
+#   make diagram — собрать diagram.json из описания схемы
+#   make diagram-capture — снять посадку и разводку из diagram.json в layout.json
 #   make clean   — очистить сборку
 #   make size    — показать размер прошивки
 #   make flash   — прошить подключённую плату (pio run -t upload)
@@ -33,7 +35,7 @@ endif
 ENV ?= esp32-s3-devkitc-1
 ACTIONLINT ?= actionlint
 
-.PHONY: help setup doctor build test sketch clean size flash sim lint check lint-cppcheck lint-diagram lint-yaml lint-workflow lint-sketch
+.PHONY: help setup doctor build test sketch clean size flash sim lint check lint-cppcheck lint-diagram lint-yaml lint-workflow lint-sketch diagram diagram-capture
 
 help:
 	@echo "Доступные цели:"
@@ -42,6 +44,8 @@ help:
 	@echo "  make build   — собрать прошивку"
 	@echo "  make test    — native-тесты чистой логики"
 	@echo "  make sketch  — пересобрать sketch.ino из src/"
+	@echo "  make diagram — собрать diagram.json из описания схемы"
+	@echo "  make diagram-capture — снять посадку и разводку из diagram.json"
 	@echo "  make clean   — очистить сборку"
 	@echo "  make size    — размер прошивки"
 	@echo "  make flash   — прошить плату"
@@ -78,6 +82,12 @@ test:
 sketch:
 	@ruby scripts/bundle-sketch.rb
 
+diagram:
+	@ruby scripts/gen-diagram.rb
+
+diagram-capture:
+	@ruby scripts/gen-diagram.rb --capture
+
 clean:
 	$(PIO) run -t clean
 
@@ -113,7 +123,8 @@ lint-cppcheck:
 	$(PIO) check -e $(ENV) --fail-on-defect medium --skip-packages
 
 lint-diagram:
-	@echo "== схема (wokwi-cli lint) =="
+	@echo "== схема (актуальность и wokwi-cli lint) =="
+	@ruby scripts/gen-diagram.rb --check
 	@$(WOKWI_CLI) lint
 
 lint-yaml:

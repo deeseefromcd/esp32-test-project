@@ -95,6 +95,18 @@ struct Changes {
   uint16_t opened;
 };
 
+// Сколько клеток занято — для сводки в serial: по числу видно, что схема
+// прочитала ровно столько фигур, сколько поставлено, без лишних клеток.
+inline int countClosed(const bool cells[kCells]) {
+  int count = 0;
+  for (int i = 0; i < kCells; ++i) {
+    if (cells[i]) {
+      ++count;
+    }
+  }
+  return count;
+}
+
 inline Changes diff(const bool prev[kCells], const bool now[kCells]) {
   Changes ch{0, 0};
   for (int i = 0; i < kCells; ++i) {
